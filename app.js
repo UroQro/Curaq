@@ -1,8 +1,9 @@
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, arrayUnion } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, arrayUnion } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// --- CONFIG ---
 const firebaseConfig = {
   apiKey: "AIzaSyBdmVCQnUjDUXqwsiCPemJZ6u0fl5DhFAo",
   authDomain: "curaq-e3118.firebaseapp.com",
@@ -22,22 +23,23 @@ const $ = id => document.getElementById(id);
 const hide = id => $(id)?.classList.add('hidden');
 const show = id => $(id)?.classList.remove('hidden');
 const getToday = () => new Date().toISOString().split('T')[0];
+
 function showToast(msg) {
     const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
     $('toast-box').appendChild(t); setTimeout(()=>t.remove(),3000);
 }
 
-// --- DATA LISTS (FULL) ---
+// --- DATA LISTS ---
 const HOSPITALS = ["Hospital Star Médica","Hospital Ángeles Querétaro","Hospital Ángeles Centro Sur","Hospital H+","Hospital San José","Hospital Moscati","Gestamed","Hospital Santa Rosa de Viterbo","Hospital Santo Tomás","Hospital Médica Ebor","Hospital Santiago de Querétaro","Hospital Jardines","Clínica San Francisco","Hospital San Pedro","Hospital del Sagrado Corazón","Clínica Las Campanas","Centro Médico Jurica","Clínica CER","Hospital Idaly Medical","CEM","Otro"];
 const DOCTORS = ["Enrique Hans Mues Guizar", "Rolando L Bonilla Silva", "Otro"];
 const INSURANCES = ["Afirme","Allianz","Atlas","Atlantis","AXA","Banorte","Bupa","VUMI","Bx+","Chubb","General de Seguros","GNP","Inbursa","La Latino","Mapfre","MetLife","Pan-American","Plan Seguro","Sisnova","Prevem","Seguros Monterrey NYL","Sura","Particular","Paquete","Otro"];
 
-// Populate dropdowns
+// Populate
 const populate = (id, arr) => {
     const s = $(id); if(!s) return; s.innerHTML='';
     arr.forEach(x => { const o = document.createElement('option'); o.value=x; o.textContent=x; s.appendChild(o); });
     s.addEventListener('change', e => {
-        const oId = id.includes('filter') ? null : id.replace('add-','add-').replace('doc','doc-other').replace('hosp','hosp-other').replace('insurance','ins-other').replace('hospital','hosp-other'); // simple mapping hack
+        const oId = id.includes('filter') ? null : id.replace('add-','add-').replace('doc','doc-other').replace('hosp','hosp-other').replace('insurance','ins-other').replace('hospital','hosp-other');
         if(oId && $(oId)) {
             if(e.target.value === 'Otro') show(oId); else hide(oId);
         }
@@ -47,43 +49,50 @@ populate('add-hospital', HOSPITALS); populate('filter-hospital', HOSPITALS);
 populate('add-doc', DOCTORS); populate('filter-doctor', DOCTORS);
 populate('add-insurance', INSURANCES);
 
-// --- ROUTER & STATE ---
-let patientsCache = [];
-let currentPatientId = null;
-
-const router = () => {
-    if(!auth.currentUser) return showAuth();
-    
-    // Simple view toggle based on variable state, not hash to keep it simpler with modals
-    // Default dashboard
-};
-
+// --- VIEW NAVIGATION ---
 function showAuth() { $('view-auth').classList.add('active'); $('view-dashboard').classList.remove('active'); $('view-detail').classList.remove('active'); }
 function showDash() { $('view-auth').classList.remove('active'); $('view-dashboard').classList.add('active'); $('view-detail').classList.remove('active'); }
 function showDetail() { $('view-detail').classList.add('active'); }
 
-// --- AUTH LOGIC ---
+// --- AUTH LOGIC (STRICT) ---
 onAuthStateChanged(auth, u => {
     hide('loader-overlay');
     if(u) { showDash(); initRealtime(); } else showAuth();
 });
 
-$('form-login').onsubmit = e => {
+// Event Listeners for Forms (Using addEventListener is safer)
+$('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
-    signInWithEmailAndPassword(auth, $('login-email').value, $('login-pass').value).catch(e=>showToast(e.message));
-};
-$('form-reg').onsubmit = e => {
+    const em = $('login-email').value;
+    const pw = $('login-pass').value;
+    try {
+        await signInWithEmailAndPassword(auth, em, pw);
+    } catch(err) {
+        showToast("Error: " + err.message);
+    }
+});
+
+$('form-reg').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if($('reg-key').value !== ADMIN_KEY) return showToast('Clave incorrecta');
-    createUserWithEmailAndPassword(auth, $('reg-email').value, $('reg-pass').value)
-        .then(c => updateProfile(c.user, {displayName: $('reg-name').value}))
-        .catch(e=>showToast(e.message));
-};
+    if($('reg-key').value !== ADMIN_KEY) return showToast('Clave Maestra Incorrecta');
+    try {
+        const c = await createUserWithEmailAndPassword(auth, $('reg-email').value, $('reg-pass').value);
+        await updateProfile(c.user, {displayName: $('reg-name').value});
+        showToast("Usuario creado");
+    } catch(err) {
+        showToast(err.message);
+    }
+});
+
 $('btn-to-reg').onclick=()=>{hide('form-login'); show('form-reg')};
 $('btn-to-login').onclick=()=>{hide('form-reg'); show('form-login')};
 $('btn-logout').onclick=()=>signOut(auth);
 
-// --- DASHBOARD LISTS ---
+// --- REALTIME DATA ---
+let patientsCache = [];
+let currentPatientId = null;
+let activeTab = 'census';
+
 function initRealtime() {
     onSnapshot(collection(db, 'patients'), snap => {
         patientsCache = snap.docs.map(d => ({id:d.id, ...d.data()}));
@@ -91,14 +100,12 @@ function initRealtime() {
     });
 }
 
-let activeTab = 'census';
 document.querySelectorAll('.tab-btn').forEach(b => {
     b.onclick = () => {
         document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));
         b.classList.add('active');
         activeTab = b.dataset.tab;
         
-        // Toggle filters
         if(activeTab==='census') { show('census-filters'); show('fab-add'); }
         else { hide('census-filters'); hide('fab-add'); }
         
@@ -116,14 +123,12 @@ function renderList() {
     patientsCache.forEach(p => {
         if(p.status !== activeTab && !(activeTab==='schedule' && p.status==='scheduled')) return;
         
-        // Filters
         if(activeTab === 'census') {
             if(hFilter && p.hospital !== hFilter) return;
             if(dFilter && p.doctor !== dFilter) return;
         }
 
         count++;
-        // Status Color
         let stClass = 'st-red';
         if(p.status === 'census') {
             if(p.lastVisitCheck === today) stClass = 'st-blue';
@@ -138,7 +143,7 @@ function renderList() {
         div.className = `patient-row ${stClass}`;
         div.onclick = () => loadDetail(p.id);
         
-        const initials = p.name.substring(0,2).toUpperCase();
+        const initials = p.name ? p.name.substring(0,2).toUpperCase() : 'XX';
         div.innerHTML = `
             <div class="bar-status"></div>
             <div class="avatar">${initials}</div>
@@ -150,7 +155,7 @@ function renderList() {
                     ${p.status==='scheduled' ? `<span class="badge-mini">${p.surgeryDate || 'S/F'}</span>` : ''}
                 </div>
             </div>
-            <i class="fas fa-chevron-right" style="color:#ddd"></i>
+            <i class="fas fa-chevron-right" style="color:#555"></i>
         `;
         box.appendChild(div);
     });
@@ -191,15 +196,12 @@ function loadDetail(id) {
     if(!p) return;
 
     $('det-name').textContent = p.name;
-    $('det-avatar').textContent = p.name.substring(0,2).toUpperCase();
+    $('det-avatar').textContent = p.name ? p.name.substring(0,2).toUpperCase() : 'XX';
     $('det-age').textContent = calculateAge(p.dob);
     $('det-hosp').textContent = p.hospital;
     $('det-dx').textContent = p.diagnosis;
     $('det-insurance').textContent = p.insurance;
-    $('det-doctor').textContent = p.doctor;
-    $('det-type').textContent = p.type;
-
-    // Visit Toggle
+    
     const chk = $('chk-visit-today');
     chk.checked = (p.lastVisitCheck === getToday());
     chk.onclick = () => updateDoc(doc(db,'patients',id), { lastVisitCheck: chk.checked ? getToday() : null });
@@ -233,14 +235,23 @@ $('btn-save-clinical').onclick = async () => {
     showToast('Datos clínicos guardados');
 };
 
-// --- ACTIONS SHEET LOGIC ---
+// --- TABS DETALLE ---
+document.querySelectorAll('.d-tab').forEach(b => {
+    b.onclick = () => {
+        document.querySelectorAll('.d-tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.d-panel').forEach(p => p.classList.remove('active'));
+        b.classList.add('active');
+        $(`panel-${b.dataset.target}`).classList.add('active');
+    }
+});
+
+// --- ACTIONS & NOTES ---
 window.app = window.app || {};
 
 $('btn-actions').onclick = () => {
     const p = patientsCache.find(x=>x.id===currentPatientId);
     $('action-sheet').classList.remove('hidden');
     hide('actions-census'); hide('actions-schedule'); hide('actions-discharge');
-    
     if(p.status === 'census') show('actions-census');
     else if(p.status === 'scheduled') show('actions-schedule');
     else show('actions-discharge');
@@ -254,7 +265,7 @@ app.markPreDischarge = async () => {
 };
 
 app.dischargePatient = async () => {
-    if(confirm('¿Confirmar Egreso? Se moverá a la pestaña de Egresos.')) {
+    if(confirm('¿Confirmar Egreso?')) {
         await updateDoc(doc(db,'patients',currentPatientId), { status: 'discharged', dischargeDate: getToday() });
         app.closeSheet(); $('view-detail').classList.remove('active');
     }
@@ -265,11 +276,7 @@ app.returnToCensus = async () => {
     app.closeSheet(); showToast('Regresado al Censo');
 };
 
-// Programar
-app.openScheduleModal = () => {
-    app.closeSheet();
-    $('modal-schedule').classList.remove('hidden');
-};
+app.openScheduleModal = () => { app.closeSheet(); $('modal-schedule').classList.remove('hidden'); };
 
 $('btn-confirm-schedule').onclick = async () => {
     const date = $('sched-date').value;
@@ -280,64 +287,29 @@ $('btn-confirm-schedule').onclick = async () => {
     showToast('Paciente Programado');
 };
 
-// --- COMPLEX NOTES LOGIC ---
 app.openNote = (type) => {
     const m = $('modal-note');
     const f = $('note-fields');
     $('form-note').dataset.type = type;
     f.innerHTML = '';
     m.classList.remove('hidden');
-    
     $('note-title').textContent = type.toUpperCase().replace('_',' ');
     
     let html = '';
-    
     if(type === 'visita') {
-        html = `
-            <input name="subj" class="input-std mb-2" placeholder="Subjetivo">
-            <div class="row mb-2"><input name="ta" class="input-std" placeholder="TA"><input name="fc" class="input-std" placeholder="FC"><input name="temp" class="input-std" placeholder="Temp"></div>
-            <input name="labs" class="input-std mb-2" placeholder="Labs relevantes">
-            <input name="gasto" class="input-std mb-2" placeholder="Gasto urinario/drenaje">
-            <textarea name="plan" placeholder="Análisis y Plan"></textarea>
-        `;
+        html = `<input name="subj" class="input-std mb-2" placeholder="Subjetivo"><div class="row mb-2"><input name="ta" class="input-std" placeholder="TA"><input name="fc" class="input-std" placeholder="FC"><input name="temp" class="input-std" placeholder="Temp"></div><input name="labs" class="input-std mb-2" placeholder="Labs"><input name="gasto" class="input-std mb-2" placeholder="Gasto"><textarea name="plan" placeholder="Plan"></textarea>`;
         show('btn-wa');
     } else if (type === 'labs') {
-        html = `
-            <div class="row mb-2"><input name="hb" class="input-std" placeholder="Hb"><input name="htc" class="input-std" placeholder="Htc"></div>
-            <div class="row mb-2"><input name="leu" class="input-std" placeholder="Leu"><input name="plaq" class="input-std" placeholder="Plaq"></div>
-            <div class="row mb-2"><input name="glu" class="input-std" placeholder="Glu"><input name="cre" class="input-std" placeholder="Cr"></div>
-            <div class="row mb-2"><input name="na" class="input-std" placeholder="Na"><input name="k" class="input-std" placeholder="K"></div>
-        `;
+        html = `<div class="row mb-2"><input name="hb" class="input-std" placeholder="Hb"><input name="htc" class="input-std" placeholder="Htc"></div><div class="row mb-2"><input name="leu" class="input-std" placeholder="Leu"><input name="plaq" class="input-std" placeholder="Plaq"></div><div class="row mb-2"><input name="glu" class="input-std" placeholder="Glu"><input name="cre" class="input-std" placeholder="Cr"></div>`;
         hide('btn-wa');
-    } else if (type === 'check_qx') {
-        html = `
-            <label class="checklist-item"><input type="checkbox" name="carta"> Carta Seguro</label>
-            <label class="checklist-item"><input type="checkbox" name="nota_int"> Nota Internamiento</label>
-            <label class="checklist-item"><input type="checkbox" name="vpo"> VPO</label>
-            <label class="checklist-item"><input type="checkbox" name="labs"> Laboratorios</label>
-            <label class="checklist-item"><input type="checkbox" name="sangre"> Sangre disponible</label>
-        `;
-        hide('btn-wa');
-    } else if (type === 'check_egr') {
-        html = `
-            <label class="checklist-item"><input type="checkbox" name="receta"> Receta</label>
-            <label class="checklist-item"><input type="checkbox" name="informe"> Informe Médico</label>
-            <label class="checklist-item"><input type="checkbox" name="nota"> Nota Egreso</label>
-            <label class="checklist-item"><input type="checkbox" name="cita"> Cita abierta</label>
-        `;
-        hide('btn-wa');
-    } else if (type === 'vpo') {
-        html = `
-            <input name="asa" class="input-std mb-2" placeholder="ASA">
-            <input name="medico" class="input-std mb-2" placeholder="Médico que valora">
-            <textarea name="text" placeholder="Comentarios VPO"></textarea>
-        `;
+    } else if (type.includes('check')) {
+        const checks = type==='check_qx' ? ['Carta Seguro','Nota Int','VPO','Labs','Sangre'] : ['Receta','Informe','Nota Egreso','Cita'];
+        html = checks.map(c => `<label class="checklist-item"><input type="checkbox" name="${c}"> ${c}</label>`).join('');
         hide('btn-wa');
     } else {
         html = `<textarea name="text" placeholder="Escriba aquí..."></textarea>`;
         hide('btn-wa');
     }
-    
     f.innerHTML = html;
 };
 
@@ -346,11 +318,7 @@ $('form-note').onsubmit = async e => {
     const type = e.target.dataset.type;
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd);
-    
-    // Handle checkboxes
-    if(type.includes('check')) {
-        e.target.querySelectorAll('input[type="checkbox"]').forEach(c => data[c.name] = c.checked);
-    }
+    e.target.querySelectorAll('input[type="checkbox"]').forEach(c => data[c.name] = c.checked);
 
     await updateDoc(doc(db,'patients',currentPatientId), {
         notes: arrayUnion({ type, data, author: auth.currentUser.displayName, timestamp: new Date().toISOString() })
@@ -370,21 +338,17 @@ function renderTimeline(notes) {
     notes.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).forEach(n => {
         const d = new Date(n.timestamp);
         let content = '';
-        if(n.type==='visita') content=`<b>S:</b> ${n.data.subj}<br><b>Plan:</b> ${n.data.plan}`;
+        if(n.type==='visita') content=`<b>S:</b> ${n.data.subj}<br><b>P:</b> ${n.data.plan}`;
         else if(n.type==='labs') content=`Hb: ${n.data.hb} Leu: ${n.data.leu} Cr: ${n.data.cre}`;
         else if(n.type.includes('check')) content = Object.keys(n.data).map(k=> `${k}: ${n.data[k]?'✅':'❌'}`).join(', ');
         else content = n.data.text || JSON.stringify(n.data);
 
         const div = document.createElement('div'); div.className='tl-item';
-        div.innerHTML = `
-            <div class="tl-header"><span>${n.type.toUpperCase()}</span> <span>${d.toLocaleDateString()} ${d.getHours()}:${d.getMinutes()}</span></div>
-            <div class="tl-content">${content}</div>
-        `;
+        div.innerHTML = `<div class="tl-header"><span>${n.type.toUpperCase()}</span> <span>${d.toLocaleDateString()} ${d.getHours()}:${d.getMinutes()}</span></div><div class="tl-content">${content}</div>`;
         box.appendChild(div);
     });
 }
 
-// Close Modals
-document.querySelectorAll('.close-modal, .close-note, .close-sched').forEach(b => b.onclick = function() {
-    this.closest('.modal-overlay').classList.add('hidden');
+document.querySelectorAll('.close-modal, .close-note, .close-sched, .close-sheet').forEach(b => b.onclick = function() {
+    this.closest('.modal-overlay, .action-sheet').classList.add('hidden');
 });
