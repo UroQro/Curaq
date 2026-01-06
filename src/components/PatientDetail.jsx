@@ -5,6 +5,20 @@ import { calculateAge, calculateDaysDiff, calculateBMI } from '../utils';
 import { ArrowLeft, Copy, Edit, Save, Check, X, Plus, Trash2, Syringe } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 
+// --- COMPONENTE INPUT DEFINIDO AFUERA PARA EVITAR RE-RENDER FOCUS LOSS ---
+const NoteInput = ({ label, k, form, setForm, placeholder, type="text" }) => (
+  <div className="flex flex-col">
+    <label className="text-[10px] uppercase font-bold text-gray-400">{label}</label>
+    <input 
+      type={type} 
+      className="border rounded p-1.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white" 
+      placeholder={placeholder} 
+      value={form[k] || ''} 
+      onChange={e=>setForm({...form, [k]: e.target.value})} 
+    />
+  </div>
+);
+
 export default function PatientDetail({ patient: initialPatient, onClose, user }) {
   const [patient, setPatient] = useState(initialPatient);
   const [showEdit, setShowEdit] = useState(false);
@@ -94,15 +108,11 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
           t += `*Líq:* GU:${c.gu||'-'} | Dren:${c.drains||'-'}\n`;
           t += `*PLAN:* ${c.plan||'-'}`;
       } else {
-          t += `*Nota:* ${JSON.stringify(c)}`;
+          t += `*Nota (${n.type}):* ${JSON.stringify(c).replace(/[{}"]/g,' ')}`;
       }
       navigator.clipboard.writeText(t);
       alert("Copiado para WhatsApp");
   };
-
-  const Input = ({ label, k, placeholder, type="text" }) => (
-      <div className="flex flex-col"><label className="text-[10px] uppercase font-bold text-gray-400">{label}</label><input type={type} className="border rounded p-1.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder={placeholder} value={noteForm[k] || ''} onChange={e=>setNoteForm({...noteForm, [k]: e.target.value})} /></div>
-  );
 
   return (
     <div className="bg-gray-50 dark:bg-slate-900 min-h-screen pb-20">
@@ -136,7 +146,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   <div className="flex flex-wrap gap-1 mb-1">
                       {patient.antecedents?.dm && <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-bold">DM</span>}
                       {patient.antecedents?.has && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px] font-bold">HAS</span>}
-                      {/* FIXED LABEL HIPO */}
                       {patient.antecedents?.hipo && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-bold">HIPOTIROIDISMO</span>}
                       {patient.antecedents?.onco && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px] font-bold">ONCO</span>}
                   </div>
@@ -145,7 +154,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               </div>
           </div>
 
-          {/* CHECKLIST PENDIENTES */}
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 p-3 rounded-lg shadow-sm">
               <h3 className="text-xs font-bold text-yellow-800 dark:text-yellow-500 uppercase mb-2 flex items-center gap-1">📌 Pendientes / Tareas</h3>
               <div className="space-y-1 mb-2">
@@ -164,7 +172,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               </div>
           </div>
 
-          {/* FORMULARIO NOTA */}
           <div className={`bg-white dark:bg-slate-800 p-3 rounded-lg shadow border ${editingNoteId ? 'border-orange-400 ring-1 ring-orange-200' : 'border-blue-200 dark:border-slate-600'}`}>
               <div className="flex justify-between items-center mb-3">
                   <h3 className={`font-bold text-sm ${editingNoteId ? 'text-orange-500' : 'text-blue-600 dark:text-blue-400'}`}>{editingNoteId ? 'EDITANDO NOTA' : 'NUEVA NOTA'}</h3>
@@ -188,15 +195,21 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                       <>
                         <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white" placeholder="Subjetivo..." value={noteForm.subj||''} onChange={e=>setNoteForm({...noteForm, subj:e.target.value})}/>
                         <div className="grid grid-cols-3 gap-2">
-                             <Input label="TA" k="ta"/> <Input label="FC" k="fc"/> <Input label="Temp" k="temp"/>
+                             <NoteInput label="TA" k="ta" form={noteForm} setForm={setNoteForm}/> 
+                             <NoteInput label="FC" k="fc" form={noteForm} setForm={setNoteForm}/> 
+                             <NoteInput label="Temp" k="temp" form={noteForm} setForm={setNoteForm}/>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                             <Input label="Gasto U (ml)" k="gu"/> <Input label="Drenajes" k="drains"/>
+                             <NoteInput label="Gasto U (ml)" k="gu" form={noteForm} setForm={setNoteForm}/> 
+                             <NoteInput label="Drenajes" k="drains" form={noteForm} setForm={setNoteForm}/>
                         </div>
                         <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border dark:border-slate-600">
                             <p className="text-[10px] font-bold text-gray-400 mb-1">LABS RÁPIDOS</p>
                             <div className="grid grid-cols-4 gap-1">
-                                <Input label="Hb" k="hb"/> <Input label="Leu" k="leu"/> <Input label="Cr" k="cr"/> <Input label="Glu" k="glu"/>
+                                <NoteInput label="Hb" k="hb" form={noteForm} setForm={setNoteForm}/> 
+                                <NoteInput label="Leu" k="leu" form={noteForm} setForm={setNoteForm}/> 
+                                <NoteInput label="Cr" k="cr" form={noteForm} setForm={setNoteForm}/> 
+                                <NoteInput label="Glu" k="glu" form={noteForm} setForm={setNoteForm}/>
                             </div>
                         </div>
                         <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white h-20" placeholder="Análisis y Plan..." value={noteForm.plan||''} onChange={e=>setNoteForm({...noteForm, plan:e.target.value})}/>
@@ -225,16 +238,28 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   
                   {noteType === 'labs' && (
                       <div className="grid grid-cols-3 gap-2">
-                          <Input label="Hb" k="hb"/> <Input label="Hto" k="htc"/> <Input label="Leu" k="leu"/> <Input label="Plq" k="plq"/>
-                          <Input label="Glu" k="glu"/> <Input label="Urea" k="urea"/> <Input label="BUN" k="bun"/> <Input label="Cr" k="cr"/>
-                          <Input label="Na" k="na"/> <Input label="K" k="k"/> <Input label="Cl" k="cl"/>
-                          <Input label="TP" k="tp"/> <Input label="TTP" k="ttp"/> <Input label="INR" k="inr"/>
+                          <NoteInput label="Hb" k="hb" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Hto" k="htc" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Leu" k="leu" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Plq" k="plq" form={noteForm} setForm={setNoteForm}/>
+                          <NoteInput label="Glu" k="glu" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Urea" k="urea" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="BUN" k="bun" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Cr" k="cr" form={noteForm} setForm={setNoteForm}/>
+                          <NoteInput label="Na" k="na" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="K" k="k" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Cl" k="cl" form={noteForm} setForm={setNoteForm}/>
+                          <NoteInput label="TP" k="tp" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="TTP" k="ttp" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="INR" k="inr" form={noteForm} setForm={setNoteForm}/>
                       </div>
                   )}
 
                   {noteType === 'vitales' && (
                       <div className="flex gap-2">
-                          <Input label="TA" k="ta"/> <Input label="FR" k="fr"/> <Input label="Temp" k="temp"/>
+                          <NoteInput label="TA" k="ta" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="FR" k="fr" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Temp" k="temp" form={noteForm} setForm={setNoteForm}/>
                       </div>
                   )}
 
@@ -247,21 +272,22 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   {noteType === 'urocultivo' && (
                       <div className="space-y-2">
                           <select className="w-full border p-2 rounded dark:bg-slate-700 dark:text-white" onChange={e=>setNoteForm({...noteForm, res:e.target.value})}><option value="">Resultado...</option><option value="+">Positivo (+)</option><option value="-">Negativo (-)</option></select>
-                          {noteForm.res === '+' && (<><Input label="Microorganismo" k="germ"/><Input label="Sensibilidad" k="sens"/></>)}
+                          {noteForm.res === '+' && (<><NoteInput label="Microorganismo" k="germ" form={noteForm} setForm={setNoteForm}/><NoteInput label="Sensibilidad" k="sens" form={noteForm} setForm={setNoteForm}/></>)}
                       </div>
                   )}
 
                   {noteType === 'somato' && (
                       <div className="flex gap-2 items-end">
-                          <Input label="Peso (kg)" k="w"/> <Input label="Talla (m)" k="h"/>
+                          <NoteInput label="Peso (kg)" k="w" form={noteForm} setForm={setNoteForm}/> 
+                          <NoteInput label="Talla (m)" k="h" form={noteForm} setForm={setNoteForm}/>
                           <div className="text-sm font-bold p-2 bg-gray-100 rounded">IMC: {calculateBMI(noteForm.w, noteForm.h)}</div>
                       </div>
                   )}
                   
                   {noteType === 'vpo' && (
                       <div className="space-y-2">
-                          <Input label="Médico que evalúa" k="doc"/>
-                          <Input label="Grupo ASA" k="asa"/>
+                          <NoteInput label="Médico que evalúa" k="doc" form={noteForm} setForm={setNoteForm}/>
+                          <NoteInput label="Grupo ASA" k="asa" form={noteForm} setForm={setNoteForm}/>
                       </div>
                   )}
 
@@ -282,6 +308,7 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                           <span>{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
                           <div className="flex items-center gap-2">
                               <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
+                              <button onClick={() => copyToWA(note)} className="text-gray-400 hover:text-green-500 transition-colors" title="Copiar a WhatsApp"><Copy size={14}/></button>
                               <button onClick={() => loadNoteForEditing(note)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button>
                               <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                           </div>
@@ -295,7 +322,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                                       TA:{note.content.ta} FC:{note.content.fc} T:{note.content.temp} | GU:{note.content.gu}
                                   </div>
                                   <p className="font-medium text-blue-800 dark:text-blue-300">P: {note.content.plan}</p>
-                                  <button onClick={()=>copyToWA(note)} className="text-[10px] text-green-600 font-bold flex gap-1 items-center mt-1"><Copy size={10}/> Copiar WA</button>
                               </div>
                           )}
                           {note.type.includes('check') && (
