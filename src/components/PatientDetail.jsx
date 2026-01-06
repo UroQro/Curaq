@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { calculateAge, calculateDaysDiff, calculateBMI } from '../utils';
-import { ArrowLeft, Copy, Edit, Save, Check, X, Plus } from 'lucide-react';
+import { ArrowLeft, Copy, Edit, Save, Check, X, Plus, Trash2, Syringe } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 
 export default function PatientDetail({ patient: initialPatient, onClose, user }) {
@@ -10,11 +10,9 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
   const [showEdit, setShowEdit] = useState(false);
   const [noteType, setNoteType] = useState('visita');
   
-  // NOTE EDITING STATE
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteForm, setNoteForm] = useState({}); 
 
-  // PENDING CHECKLIST STATE
   const [newChecklistTask, setNewChecklistTask] = useState('');
 
   useEffect(() => {
@@ -31,19 +29,15 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
 
   const getUserName = () => user.displayName || user.email.split('@')[0];
 
-  // --- LOGICA NOTAS ---
   const handleSaveNote = async () => {
       if(Object.keys(noteForm).length === 0) return alert("Llena los campos");
-      
       let updatedNotes;
       if (editingNoteId) {
-          // ACTUALIZAR NOTA EXISTENTE
           updatedNotes = patient.notes.map(n => n.id === editingNoteId ? { ...n, content: noteForm, type: noteType } : n);
           await updateDoc(doc(db, "patients", patient.id), { notes: updatedNotes });
           alert("Nota actualizada");
           setEditingNoteId(null);
       } else {
-          // CREAR NUEVA NOTA
           const newNote = {
               id: Date.now().toString(),
               type: noteType,
@@ -57,6 +51,12 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
       setNoteForm({});
   };
 
+  const deleteNote = async (noteId) => {
+      if(!confirm("¿Eliminar nota?")) return;
+      const updatedNotes = patient.notes.filter(n => n.id !== noteId);
+      await updateDoc(doc(db, "patients", patient.id), { notes: updatedNotes });
+  };
+
   const loadNoteForEditing = (note) => {
       setNoteType(note.type);
       setNoteForm(note.content);
@@ -64,7 +64,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
       window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
-  // --- LOGICA CHECKLIST PENDIENTES ---
   const addPendingTask = async () => {
       if(!newChecklistTask.trim()) return;
       const newTask = { text: newChecklistTask, done: false };
@@ -123,6 +122,12 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   <div><span className="font-bold block text-xs text-gray-400">SEGURO</span>{patient.insurance}</div>
                   <div><span className="font-bold block text-xs text-gray-400">TELÉFONO</span><a href={`tel:${patient.phone}`} className="text-blue-500 underline">{patient.phone}</a></div>
               </div>
+              {patient.surgery && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded mb-2 border border-blue-100 dark:border-blue-900/50">
+                      <span className="font-bold block text-xs text-blue-400 uppercase flex items-center gap-1"><Syringe size={12}/> Cirugía</span>
+                      <span className="font-bold text-blue-900 dark:text-blue-200">{patient.surgery}</span>
+                  </div>
+              )}
               <div className="border-t pt-2 mt-2 dark:border-slate-700">
                   <div className="flex justify-between items-center mb-1">
                       <span className="font-bold block text-xs text-gray-400">ANTECEDENTES</span>
@@ -131,6 +136,8 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   <div className="flex flex-wrap gap-1 mb-1">
                       {patient.antecedents?.dm && <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-bold">DM</span>}
                       {patient.antecedents?.has && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px] font-bold">HAS</span>}
+                      {/* FIXED LABEL HIPO */}
+                      {patient.antecedents?.hipo && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-bold">HIPOTIROIDISMO</span>}
                       {patient.antecedents?.onco && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px] font-bold">ONCO</span>}
                   </div>
                   <p className="text-xs text-gray-600 dark:text-gray-300">{patient.antecedents?.other || 'Sin otros antecedentes'}</p>
@@ -138,7 +145,7 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               </div>
           </div>
 
-          {/* --- CHECKLIST PENDIENTES EDITABLE --- */}
+          {/* CHECKLIST PENDIENTES */}
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 p-3 rounded-lg shadow-sm">
               <h3 className="text-xs font-bold text-yellow-800 dark:text-yellow-500 uppercase mb-2 flex items-center gap-1">📌 Pendientes / Tareas</h3>
               <div className="space-y-1 mb-2">
@@ -276,6 +283,7 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                           <div className="flex items-center gap-2">
                               <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
                               <button onClick={() => loadNoteForEditing(note)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button>
+                              <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                           </div>
                       </div>
                       <div className="text-sm text-slate-800 dark:text-slate-200">
@@ -293,8 +301,9 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                           {note.type.includes('check') && (
                               <div className="text-xs space-y-1">
                                   {Object.entries(note.content).map(([k,v]) => (
-                                      <div key={k} className={`flex items-center gap-1 ${v ? 'text-green-700 dark:text-green-400' : 'text-gray-400 line-through decoration-red-500 decoration-2'}`}>
-                                          {v ? <Check size={12}/> : <X size={12} className="text-red-500"/>} {k}
+                                      <div key={k} className={`flex items-center gap-1 ${v ? 'text-green-700 dark:text-green-400' : 'text-gray-400 decoration-red-500'}`}>
+                                          {v ? <Check size={12}/> : <X size={12} className="text-red-500"/>} 
+                                          <span className={!v ? 'line-through text-gray-400' : ''}>{k}</span>
                                       </div>
                                   ))}
                               </div>

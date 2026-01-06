@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore';
 import { downloadCSV, getLocalISODate } from '../utils';
-import { Calendar, Download, Trash2 } from 'lucide-react';
+import { Calendar, Download, Trash2, Syringe, LogIn } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 import PatientDetail from './PatientDetail';
 
@@ -24,14 +24,21 @@ export default function Programming({ user }) {
   const today = getLocalISODate();
 
   const exportCSV = () => {
-      const data = list.map(p => [p.scheduledDate, p.name, p.procedure || 'N/A', p.hospital, p.doctor, p.insurance]);
-      downloadCSV(data, ["Fecha", "Paciente", "Procedimiento", "Hospital", "Dr", "Seguro"], "Programacion_Qx.csv");
+      const data = list.map(p => [p.scheduledDate, p.name, p.surgery || p.procedure || 'N/A', p.hospital, p.doctor, p.insurance]);
+      downloadCSV(data, ["Fecha", "Paciente", "Cirugia", "Hospital", "Dr", "Seguro"], "Programacion_Qx.csv");
   };
 
   const removeFromSchedule = async (e, id) => {
       e.stopPropagation();
       if(confirm("¿Quitar de la programación?")) {
           await updateDoc(doc(db, "patients", id), { scheduledDate: "" }); 
+      }
+  };
+  
+  const admitPatient = async (e, p) => {
+      e.stopPropagation();
+      if(confirm(`¿Ingresar a ${p.name} al Censo Activo (Hospitalizar)?`)) {
+          await updateDoc(doc(db, "patients", p.id), { status: 'active', admissionDate: new Date().toISOString() });
       }
   };
 
@@ -61,7 +68,6 @@ export default function Programming({ user }) {
                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${isToday ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                                        {dateObj.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()}
                                    </span>
-                                   {/* ACENTUACION HOSPITAL */}
                                    <span className="text-xs font-black bg-blue-900 text-white px-2 py-0.5 rounded shadow-sm tracking-wide">{p.hospital}</span>
                                    
                                    {p.status === 'pre_admission' && <span className="text-[10px] border border-blue-200 text-blue-500 px-1 rounded uppercase">Ambulatorio</span>}
@@ -69,9 +75,15 @@ export default function Programming({ user }) {
                                </div>
                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{p.name}</h3>
                                <p className="text-sm text-blue-600 dark:text-blue-300 font-medium">{p.diagnosis}</p>
+                               {p.surgery && <p className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1"><Syringe size={12}/> {p.surgery}</p>}
                                <div className="text-xs text-slate-500 mt-1">{p.doctor} • {p.insurance}</div>
                            </div>
-                           <button onClick={(e)=>removeFromSchedule(e, p.id)} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded-full"><Trash2 size={16}/></button>
+                           <div className="flex flex-col gap-2">
+                               {p.status === 'pre_admission' && (
+                                   <button onClick={(e)=>admitPatient(e, p)} className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 p-2 rounded-full hover:bg-indigo-200" title="Ingresar a Piso"><LogIn size={16}/></button>
+                               )}
+                               <button onClick={(e)=>removeFromSchedule(e, p.id)} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded-full"><Trash2 size={16}/></button>
+                           </div>
                        </div>
                    </div>
                );

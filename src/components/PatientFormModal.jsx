@@ -9,7 +9,7 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
   const [form, setForm] = useState(initialData || { 
       name: '', hospital: '', type: 'Médico', doctor: '', insurance: '', dob: '', diagnosis: '', phone: '',
       status: defaultStatus, dailyCheck: false, preDischarge: false, notes: [], checklist: [],
-      scheduledDate: '', 
+      scheduledDate: '', surgery: '',
       antecedents: { dm: false, has: false, hipo: false, onco: false, other: '', meds: '', sx: '' }, allergies: ''
   });
   const [isOtherHosp, setIsOtherHosp] = useState(false);
@@ -55,17 +55,22 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
                       </div>
                   </div>
 
+                  {/* ANTECEDENTES: LABEL FIXED */}
                   <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded border dark:border-slate-600">
                       <label className={labelClass}>Antecedentes</label>
-                      <div className="grid grid-cols-3 gap-2 mb-2 text-sm dark:text-white">
+                      <div className="grid grid-cols-2 gap-2 mb-2 text-sm dark:text-white">
                          <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.dm || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, dm:e.target.checked}})}/> DM</label>
                          <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.has || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, has:e.target.checked}})}/> HAS</label>
-                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.hipo || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, hipo:e.target.checked}})}/> Hipo</label>
+                         {/* HIPO CHANGED TO HIPOTIROIDISMO LABEL */}
+                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.hipo || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, hipo:e.target.checked}})}/> Hipotiroidismo</label>
                          <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.onco || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, onco:e.target.checked}})}/> Onco</label>
                       </div>
-                      <input placeholder="Otros..." className={`mb-2 ${inputClass} text-xs h-8`} value={form.antecedents?.other || ''} onChange={e=>setForm({...form, antecedents: {...form.antecedents, other:e.target.value}})} />
+                      <input placeholder="Otros antecedentes..." className={`mb-2 ${inputClass} text-xs h-8`} value={form.antecedents?.other || ''} onChange={e=>setForm({...form, antecedents: {...form.antecedents, other:e.target.value}})} />
                       <input placeholder="Alergias" className={`${inputClass} text-xs h-8 border-red-200 dark:border-red-900/50`} value={form.allergies} onChange={e=>setForm({...form, allergies:e.target.value})} />
                   </div>
+
+                  {/* SURGERY FIELD */}
+                  <div><label className={labelClass}>Cirugía a Realizar / Realizada</label><input className={inputClass} value={form.surgery} onChange={e=>setForm({...form, surgery:e.target.value})} placeholder="Procedimiento..." /></div>
 
                   {originContext === 'programming' && (
                      <div><label className={labelClass}>Fecha Programada</label><input type="date" required className={inputClass} value={form.scheduledDate} onChange={e=>setForm({...form, scheduledDate:e.target.value})} /></div>

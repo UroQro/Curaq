@@ -5,7 +5,7 @@ import { HOSPITALS, DOCTORS } from '../constants';
 import { calculateAge } from '../utils';
 import PatientDetail from './PatientDetail';
 import PatientFormModal from './PatientFormModal';
-import { Plus, CheckSquare, Square, LogOut, CalendarClock, Briefcase } from 'lucide-react';
+import { Plus, CheckSquare, Square, LogOut, CalendarClock, Briefcase, Syringe } from 'lucide-react';
 
 export default function Census({ user }) {
   const [patients, setPatients] = useState([]);
@@ -61,8 +61,9 @@ export default function Census({ user }) {
                         {p.scheduledDate && <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1 rounded font-bold flex items-center gap-1"><CalendarClock size={10}/> Programado</span>}
                      </div>
                      <h3 className="font-extrabold text-lg text-slate-900 dark:text-white leading-tight mb-1">{p.name}</h3>
-                     <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">{calculateAge(p.dob)} años • {p.diagnosis}</p>
-                     <div className="text-xs opacity-80 flex gap-3 text-slate-500 dark:text-slate-400">
+                     <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{calculateAge(p.dob)} años • {p.diagnosis}</p>
+                     {p.surgery && <p className="text-xs font-bold text-blue-600 dark:text-blue-300 flex items-center gap-1"><Syringe size={12}/> {p.surgery}</p>}
+                     <div className="text-xs opacity-80 flex gap-3 text-slate-500 dark:text-slate-400 mt-2">
                         <span>👨‍⚕️ {p.doctor}</span>
                         <span>🛡️ {p.insurance}</span>
                      </div>
