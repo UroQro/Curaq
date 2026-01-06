@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CURAQ Patient Management</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d47a1">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p>Cargando CURAQ...</p>
+    </div>
+
+    <div id="app" class="hidden">
+        
+        <section id="auth-view" class="view">
+            <div class="auth-card">
+                <div class="logo-area">
+                    <h1>CURAQ</h1>
+                    <p>Patient Management</p>
+                </div>
+                
+                <form id="login-form">
+                    <h2>Iniciar Sesión</h2>
+                    <input type="email" id="login-email" placeholder="Correo electrónico" required>
+                    <input type="password" id="login-password" placeholder="Contraseña" required>
+                    <button type="submit" class="btn-primary">Entrar</button>
+                    <p class="toggle-auth">¿No tienes cuenta? <span id="btn-goto-register">Registrar Usuario</span></p>
+                </form>
+
+                <form id="register-form" class="hidden">
+                    <h2>Nuevo Usuario</h2>
+                    <input type="email" id="reg-email" placeholder="Correo electrónico" required>
+                    <input type="text" id="reg-name" placeholder="Nombre Completo" required>
+                    <input type="password" id="reg-password" placeholder="Contraseña" required>
+                    <input type="password" id="reg-key" placeholder="Clave de Acceso (Admin)" required>
+                    <button type="submit" class="btn-secondary">Crear Cuenta</button>
+                    <p class="toggle-auth">¿Ya tienes cuenta? <span id="btn-goto-login">Iniciar Sesión</span></p>
+                </form>
+            </div>
+        </section>
+
+        <section id="dashboard-view" class="view hidden">
+            <header class="top-bar">
+                <div class="user-info">
+                    <i class="fas fa-user-md"></i>
+                    <span id="user-display-name">Usuario</span>
+                </div>
+                <button id="btn-logout"><i class="fas fa-sign-out-alt"></i> Salir</button>
+            </header>
+
+            <nav class="main-nav">
+                <button class="nav-btn active" data-target="census">Censo</button>
+                <button class="nav-btn" data-target="schedule">Programación</button>
+                <button class="nav-btn" data-target="discharges">Egresos</button>
+            </nav>
+
+            <main class="content-container">
+                
+                <div id="tab-census" class="tab-content active">
+                    <div class="filters-bar">
+                        <select id="filter-hospital"><option value="">Todos los Hospitales</option></select>
+                        <select id="filter-doctor"><option value="">Todos los Tratantes</option></select>
+                    </div>
+                    <div id="census-list" class="cards-grid"></div>
+                    <button class="fab" id="fab-add-census"><i class="fas fa-plus"></i></button>
+                </div>
+
+                <div id="tab-schedule" class="tab-content">
+                    <div class="action-bar">
+                        <h3>Próximas Cirugías</h3>
+                        <button class="btn-small" id="btn-download-csv"><i class="fas fa-file-csv"></i> Descargar Historial</button>
+                    </div>
+                    <div id="schedule-list" class="cards-grid"></div>
+                    <button class="fab" id="fab-add-schedule"><i class="fas fa-calendar-plus"></i></button>
+                </div>
+
+                <div id="tab-discharges" class="tab-content">
+                    <div id="discharge-list" class="cards-grid"></div>
+                </div>
+
+            </main>
+        </section>
+    </div>
+
+    <div id="modal-patient" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Nuevo Paciente</h2>
+            <form id="form-patient">
+                <input type="hidden" id="pat-id">
+                
+                <div class="form-group">
+                    <label>Hospital</label>
+                    <select id="pat-hospital" required></select>
+                    <input type="text" id="pat-hospital-other" class="hidden" placeholder="Especifique Hospital">
+                </div>
+
+                <div class="form-group">
+                    <label>Nombre Completo</label>
+                    <input type="text" id="pat-name" required>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>Fecha Nacimiento</label>
+                        <input type="date" id="pat-dob" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="pat-case-type">
+                            <option value="Médico">Médico</option>
+                            <option value="Quirúrgico">Quirúrgico</option>
+                            <option value="Interconsulta">Interconsulta</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Diagnóstico</label>
+                    <input type="text" id="pat-diagnosis" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Médico Tratante</label>
+                    <select id="pat-doctor"></select>
+                    <input type="text" id="pat-doctor-other" class="hidden" placeholder="Otro Doctor">
+                </div>
+
+                <div class="form-group">
+                    <label>Seguro</label>
+                    <select id="pat-insurance"></select>
+                    <input type="text" id="pat-insurance-other" class="hidden" placeholder="Otro Seguro">
+                </div>
+
+                <div class="form-group hidden" id="group-schedule-date">
+                    <label>Fecha de Cirugía</label>
+                    <input type="date" id="pat-schedule-date">
+                </div>
+
+                <button type="submit" class="btn-primary full-width">Guardar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-details" class="modal">
+        <div class="modal-content large">
+            <span class="close-modal">&times;</span>
+            
+            <div class="details-header">
+                <h2 id="det-name">Nombre del Paciente</h2>
+                <div class="det-badges">
+                    <span id="det-age" class="badge">Edad</span>
+                    <span id="det-hospital" class="badge secondary">Hosp</span>
+                    <span id="det-insurance" class="badge outline">Seguro</span>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <h3><i class="fas fa-id-card"></i> Identificación y Antecedentes</h3>
+                <div class="form-group">
+                    <label>Teléfono de Contacto</label>
+                    <input type="tel" id="det-phone" placeholder="Sin registro">
+                </div>
+                <div class="checkbox-grid">
+                    <label><input type="checkbox" id="ant-dm"> DM</label>
+                    <label><input type="checkbox" id="ant-has"> HAS</label>
+                    <label><input type="checkbox" id="ant-hipo"> Hipotiroidismo</label>
+                    <label><input type="checkbox" id="ant-onco"> Oncológicos</label>
+                </div>
+                <textarea id="det-history-text" placeholder="Alergias, otros antecedentes..."></textarea>
+                <div class="row">
+                    <textarea id="det-meds" placeholder="Medicamentos habituales"></textarea>
+                    <textarea id="det-surgeries" placeholder="Cirugías previas"></textarea>
+                </div>
+                <button id="btn-save-meta" class="btn-small">Actualizar Datos Ficha</button>
+            </div>
+
+            <div class="details-section">
+                <h3><i class="fas fa-notes-medical"></i> Agregar Nota</h3>
+                <div class="notes-menu">
+                    <button class="note-btn" onclick="app.openNoteModal('visita')">Visita Diaria</button>
+                    <button class="note-btn" onclick="app.openNoteModal('verif_qx')">Verif. Quirúrgica</button>
+                    <button class="note-btn" onclick="app.openNoteModal('verif_egreso')">Verif. Egreso</button>
+                    <button class="note-btn" onclick="app.openNoteModal('labs')">Laboratorios</button>
+                    <button class="note-btn" onclick="app.openNoteModal('signos')">Signos Vitales</button>
+                    <button class="note-btn" onclick="app.openNoteModal('sonda')">Sonda</button>
+                    <button class="note-btn" onclick="app.openNoteModal('urocultivo')">Urocultivo</button>
+                    <button class="note-btn" onclick="app.openNoteModal('imc')">Peso/Talla</button>
+                    <button class="note-btn" onclick="app.openNoteModal('procedimiento')">Procedimiento</button>
+                    <button class="note-btn" onclick="app.openNoteModal('imagen')">Imagen</button>
+                    <button class="note-btn" onclick="app.openNoteModal('vpo')">VPO</button>
+                    <button class="note-btn" onclick="app.openNoteModal('libre')">Nota Libre</button>
+                </div>
+            </div>
+
+            <div id="notes-timeline" class="timeline">
+                </div>
+        </div>
+    </div>
+
+    <div id="modal-note-editor" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3 id="note-editor-title">Nueva Nota</h3>
+            <form id="form-note">
+                <div id="note-fields-container"></div>
+                <button type="submit" class="btn-primary full-width">Guardar Nota</button>
+                <button type="button" id="btn-copy-wa" class="btn-whatsapp full-width hidden"><i class="fab fa-whatsapp"></i> Copiar para WhatsApp</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
