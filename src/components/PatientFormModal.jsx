@@ -4,13 +4,11 @@ import { addDoc, updateDoc, collection, doc } from 'firebase/firestore';
 import { HOSPITALS, DOCTORS, INSURANCES } from '../constants';
 
 export default function PatientFormModal({ onClose, mode, initialData, originContext }) {
-  // originContext: 'census' or 'programming'. Defaults status to 'active' or 'pre_admission'
-  
   const defaultStatus = originContext === 'programming' ? 'pre_admission' : 'active';
   
   const [form, setForm] = useState(initialData || { 
       name: '', hospital: '', type: 'Médico', doctor: '', insurance: '', dob: '', diagnosis: '', phone: '',
-      status: defaultStatus, dailyCheck: false, preDischarge: false, notes: [],
+      status: defaultStatus, dailyCheck: false, preDischarge: false, notes: [], checklist: [],
       scheduledDate: '', 
       antecedents: { dm: false, has: false, hipo: false, onco: false, other: '', meds: '', sx: '' }, allergies: ''
   });
@@ -57,7 +55,6 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
                       </div>
                   </div>
 
-                  {/* ANTECEDENTES SECTION IN EDIT MODE IF TRIGGERED OR CREATE */}
                   <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded border dark:border-slate-600">
                       <label className={labelClass}>Antecedentes</label>
                       <div className="grid grid-cols-3 gap-2 mb-2 text-sm dark:text-white">
@@ -70,7 +67,6 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
                       <input placeholder="Alergias" className={`${inputClass} text-xs h-8 border-red-200 dark:border-red-900/50`} value={form.allergies} onChange={e=>setForm({...form, allergies:e.target.value})} />
                   </div>
 
-                  {/* DATE SCHEDULER ONLY IF NEEDED HERE OR PRE-ADMISSION */}
                   {originContext === 'programming' && (
                      <div><label className={labelClass}>Fecha Programada</label><input type="date" required className={inputClass} value={form.scheduledDate} onChange={e=>setForm({...form, scheduledDate:e.target.value})} /></div>
                   )}

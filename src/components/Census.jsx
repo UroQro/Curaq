@@ -14,7 +14,6 @@ export default function Census({ user }) {
   const [filterHosp, setFilterHosp] = useState('');
   const [filterDoc, setFilterDoc] = useState('');
 
-  // SOLO Carga pacientes activos (Ingresados)
   useEffect(() => {
     const q = query(collection(db, "patients"), where("status", "==", "active"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -30,8 +29,6 @@ export default function Census({ user }) {
   const sendToProgramming = async (e, p) => { 
       e.stopPropagation(); 
       const date = prompt("Fecha de Cirugía (YYYY-MM-DD):", new Date().toISOString().slice(0,10));
-      // NOTA: NO cambiamos el status a 'scheduled', solo agregamos la fecha. 
-      // El paciente permanece en Censo (status: active) y aparece en Programación.
       if(date) await updateDoc(doc(db, "patients", p.id), { scheduledDate: date });
       alert("Programación actualizada.");
   };
@@ -48,7 +45,6 @@ export default function Census({ user }) {
 
   return (
     <div className="pb-24">
-      {/* FILTROS */}
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow border border-slate-200 dark:border-slate-700 mb-4 sticky top-0 z-10 flex gap-2">
          <select className="flex-1 p-2 border rounded text-xs bg-slate-50 dark:bg-slate-700 dark:text-white dark:border-slate-600" value={filterHosp} onChange={e=>setFilterHosp(e.target.value)}><option value="">Todos los Hospitales</option>{HOSPITALS.map(h => <option key={h.abbr} value={h.abbr}>{h.abbr} - {h.full}</option>)}</select>
          <select className="flex-1 p-2 border rounded text-xs bg-slate-50 dark:bg-slate-700 dark:text-white dark:border-slate-600" value={filterDoc} onChange={e=>setFilterDoc(e.target.value)}><option value="">Todos los Tratantes</option>{DOCTORS.map(d => <option key={d}>{d}</option>)}<option value="Otro">Otro...</option></select>

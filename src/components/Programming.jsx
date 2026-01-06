@@ -11,12 +11,10 @@ export default function Programming({ user }) {
   const [showModal, setShowModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   
-  // Queries patients that have a scheduledDate defined, REGARDLESS OF STATUS (Active or Pre-admission)
   useEffect(() => {
     const q = query(collection(db, "patients"), where("scheduledDate", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort by date
       data.sort((a,b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
       setList(data);
     });
@@ -32,7 +30,7 @@ export default function Programming({ user }) {
 
   const removeFromSchedule = async (e, id) => {
       e.stopPropagation();
-      if(confirm("¿Quitar de la programación? (El paciente permanecerá en Censo si está activo)")) {
+      if(confirm("¿Quitar de la programación?")) {
           await updateDoc(doc(db, "patients", id), { scheduledDate: "" }); 
       }
   };
@@ -59,12 +57,14 @@ export default function Programming({ user }) {
                    <div key={p.id} onClick={() => setSelectedPatient(p)} className={`cursor-pointer bg-white dark:bg-slate-800 p-4 rounded-lg shadow border-l-[6px] border-blue-500 dark:border-blue-400 ${opacity} hover:opacity-100 transition active:scale-[0.98]`}>
                        <div className="flex justify-between items-start">
                            <div>
-                               <div className="flex items-center gap-2 mb-1">
+                               <div className="flex items-center gap-2 mb-2">
                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${isToday ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                                        {dateObj.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase()}
                                    </span>
-                                   <span className="text-xs font-bold text-slate-400">{p.hospital}</span>
-                                   {p.status === 'pre_admission' && <span className="text-[10px] border border-blue-200 text-blue-500 px-1 rounded uppercase">Ambulatorio / Pre-Ingreso</span>}
+                                   {/* ACENTUACION HOSPITAL */}
+                                   <span className="text-xs font-black bg-blue-900 text-white px-2 py-0.5 rounded shadow-sm tracking-wide">{p.hospital}</span>
+                                   
+                                   {p.status === 'pre_admission' && <span className="text-[10px] border border-blue-200 text-blue-500 px-1 rounded uppercase">Ambulatorio</span>}
                                    {p.status === 'active' && <span className="text-[10px] bg-red-100 text-red-500 px-1 rounded uppercase font-bold">Hospitalizado</span>}
                                </div>
                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{p.name}</h3>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { calculateAge, calculateDaysDiff, calculateBMI } from '../utils';
-import { ArrowLeft, Copy, Edit, Save } from 'lucide-react';
+import { ArrowLeft, Copy, Edit, Save, Check, X, Plus } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 
 export default function PatientDetail({ patient: initialPatient, onClose, user }) {
@@ -10,10 +10,16 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
   const [showEdit, setShowEdit] = useState(false);
   const [noteType, setNoteType] = useState('visita');
   
+  // NOTE EDITING STATE
+  const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteForm, setNoteForm] = useState({}); 
+
+  // PENDING CHECKLIST STATE
+  const [newChecklistTask, setNewChecklistTask] = useState('');
 
   useEffect(() => {
       setNoteForm({});
+      setEditingNoteId(null);
   }, [noteType]);
 
   useEffect(() => {
@@ -25,18 +31,58 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
 
   const getUserName = () => user.displayName || user.email.split('@')[0];
 
+  // --- LOGICA NOTAS ---
   const handleSaveNote = async () => {
       if(Object.keys(noteForm).length === 0) return alert("Llena los campos");
-      const newNote = {
-          id: Date.now().toString(),
-          type: noteType,
-          author: getUserName(),
-          timestamp: new Date().toISOString(),
-          content: noteForm
-      };
-      await updateDoc(doc(db, "patients", patient.id), { notes: arrayUnion(newNote) });
+      
+      let updatedNotes;
+      if (editingNoteId) {
+          // ACTUALIZAR NOTA EXISTENTE
+          updatedNotes = patient.notes.map(n => n.id === editingNoteId ? { ...n, content: noteForm, type: noteType } : n);
+          await updateDoc(doc(db, "patients", patient.id), { notes: updatedNotes });
+          alert("Nota actualizada");
+          setEditingNoteId(null);
+      } else {
+          // CREAR NUEVA NOTA
+          const newNote = {
+              id: Date.now().toString(),
+              type: noteType,
+              author: getUserName(),
+              timestamp: new Date().toISOString(),
+              content: noteForm
+          };
+          await updateDoc(doc(db, "patients", patient.id), { notes: arrayUnion(newNote) });
+          alert("Nota guardada");
+      }
       setNoteForm({});
-      alert("Nota guardada");
+  };
+
+  const loadNoteForEditing = (note) => {
+      setNoteType(note.type);
+      setNoteForm(note.content);
+      setEditingNoteId(note.id);
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  // --- LOGICA CHECKLIST PENDIENTES ---
+  const addPendingTask = async () => {
+      if(!newChecklistTask.trim()) return;
+      const newTask = { text: newChecklistTask, done: false };
+      const currentList = patient.checklist || [];
+      await updateDoc(doc(db, "patients", patient.id), { checklist: [...currentList, newTask] });
+      setNewChecklistTask('');
+  };
+
+  const toggleTask = async (idx) => {
+      const newList = [...(patient.checklist || [])];
+      newList[idx].done = !newList[idx].done;
+      await updateDoc(doc(db, "patients", patient.id), { checklist: newList });
+  };
+
+  const deleteTask = async (idx) => {
+      const newList = [...(patient.checklist || [])];
+      newList.splice(idx, 1);
+      await updateDoc(doc(db, "patients", patient.id), { checklist: newList });
   };
 
   const copyToWA = (n) => {
@@ -61,7 +107,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
 
   return (
     <div className="bg-gray-50 dark:bg-slate-900 min-h-screen pb-20">
-      {/* HEADER */}
       <div className="sticky top-0 z-20 bg-white dark:bg-slate-800 shadow-sm border-b dark:border-slate-700 p-3 flex items-center gap-3">
           <button onClick={onClose}><ArrowLeft className="text-slate-600 dark:text-slate-300"/></button>
           <div className="flex-1">
@@ -72,7 +117,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
       </div>
 
       <div className="p-3 space-y-4">
-          {/* INFO CARD */}
           <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm shadow-sm relative">
               <div className="grid grid-cols-2 gap-2 mb-2">
                   <div><span className="font-bold block text-xs text-gray-400">TRATANTE</span>{patient.doctor}</div>
@@ -82,7 +126,7 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               <div className="border-t pt-2 mt-2 dark:border-slate-700">
                   <div className="flex justify-between items-center mb-1">
                       <span className="font-bold block text-xs text-gray-400">ANTECEDENTES</span>
-                      <button onClick={()=>setShowEdit(true)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200">✏️ Editar / Agregar</button>
+                      <button onClick={()=>setShowEdit(true)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200">✏️ Editar</button>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-1">
                       {patient.antecedents?.dm && <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-bold">DM</span>}
@@ -94,10 +138,29 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               </div>
           </div>
 
-          {/* NEW NOTE FORM */}
-          <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow border border-blue-200 dark:border-slate-600">
+          {/* --- CHECKLIST PENDIENTES EDITABLE --- */}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 p-3 rounded-lg shadow-sm">
+              <h3 className="text-xs font-bold text-yellow-800 dark:text-yellow-500 uppercase mb-2 flex items-center gap-1">📌 Pendientes / Tareas</h3>
+              <div className="space-y-1 mb-2">
+                  {patient.checklist?.map((task, i) => (
+                      <div key={i} className="flex items-center gap-2 group">
+                          <input type="checkbox" checked={task.done} onChange={()=>toggleTask(i)} className="accent-yellow-600"/>
+                          <span className={`text-sm flex-1 ${task.done ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{task.text}</span>
+                          <button onClick={()=>deleteTask(i)} className="text-red-300 hover:text-red-500"><X size={14}/></button>
+                      </div>
+                  ))}
+                  {(!patient.checklist || patient.checklist.length === 0) && <p className="text-xs text-gray-400 italic">No hay pendientes.</p>}
+              </div>
+              <div className="flex gap-2">
+                  <input className="flex-1 text-sm border border-yellow-300 rounded px-2 py-1 bg-white dark:bg-slate-800 dark:border-slate-600" placeholder="Nuevo pendiente..." value={newChecklistTask} onChange={e=>setNewChecklistTask(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addPendingTask()}/>
+                  <button onClick={addPendingTask} className="bg-yellow-400 text-yellow-900 rounded px-3 font-bold hover:bg-yellow-500"><Plus size={16}/></button>
+              </div>
+          </div>
+
+          {/* FORMULARIO NOTA */}
+          <div className={`bg-white dark:bg-slate-800 p-3 rounded-lg shadow border ${editingNoteId ? 'border-orange-400 ring-1 ring-orange-200' : 'border-blue-200 dark:border-slate-600'}`}>
               <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-bold text-sm text-blue-600 dark:text-blue-400">NUEVA NOTA</h3>
+                  <h3 className={`font-bold text-sm ${editingNoteId ? 'text-orange-500' : 'text-blue-600 dark:text-blue-400'}`}>{editingNoteId ? 'EDITANDO NOTA' : 'NUEVA NOTA'}</h3>
                   <select className="text-xs p-1 border rounded bg-slate-50 dark:bg-slate-700 dark:text-white" value={noteType} onChange={e=>setNoteType(e.target.value)}>
                       <option value="visita">Visita Diaria</option>
                       <option value="check_qx">Verificación Qx</option>
@@ -114,7 +177,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
               </div>
 
               <div className="space-y-2 mb-3">
-                  {/* DYNAMIC INPUTS BASED ON TYPE */}
                   {noteType === 'visita' && (
                       <>
                         <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white" placeholder="Subjetivo..." value={noteForm.subj||''} onChange={e=>setNoteForm({...noteForm, subj:e.target.value})}/>
@@ -201,20 +263,23 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                   )}
               </div>
 
-              <button onClick={handleSaveNote} className="w-full bg-blue-600 text-white py-2 rounded font-bold shadow hover:bg-blue-700 flex justify-center items-center gap-2"><Save size={16}/> Guardar Nota</button>
+              <button onClick={handleSaveNote} className={`w-full text-white py-2 rounded font-bold shadow flex justify-center items-center gap-2 ${editingNoteId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                  <Save size={16}/> {editingNoteId ? 'Actualizar Nota' : 'Guardar Nota'}
+              </button>
           </div>
 
-          {/* NOTE HISTORY */}
           <div className="space-y-3">
               {patient.notes?.slice().reverse().map(note => (
-                  <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded shadow-sm border border-gray-100 dark:border-slate-700 relative">
+                  <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded shadow-sm border border-gray-100 dark:border-slate-700 relative group">
                       <div className="flex justify-between items-center text-xs text-gray-400 mb-2 border-b pb-1">
                           <span>{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
-                          <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
-                          <span className="font-bold text-blue-500">{note.author}</span>
+                          <div className="flex items-center gap-2">
+                              <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
+                              <button onClick={() => loadNoteForEditing(note)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button>
+                          </div>
                       </div>
                       <div className="text-sm text-slate-800 dark:text-slate-200">
-                          {/* RENDER CONTENT BASED ON TYPE */}
+                          {/* RENDER CONTENT */}
                           {note.type === 'visita' && (
                               <div className="space-y-1">
                                   <p><span className="font-bold">S:</span> {note.content.subj}</p>
@@ -226,9 +291,13 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
                               </div>
                           )}
                           {note.type.includes('check') && (
-                              <ul className="list-disc pl-4 text-xs">
-                                  {Object.entries(note.content).map(([k,v]) => v && <li key={k}>{k}</li>)}
-                              </ul>
+                              <div className="text-xs space-y-1">
+                                  {Object.entries(note.content).map(([k,v]) => (
+                                      <div key={k} className={`flex items-center gap-1 ${v ? 'text-green-700 dark:text-green-400' : 'text-gray-400 line-through decoration-red-500 decoration-2'}`}>
+                                          {v ? <Check size={12}/> : <X size={12} className="text-red-500"/>} {k}
+                                      </div>
+                                  ))}
+                              </div>
                           )}
                           {note.type === 'sonda' && <p>Colocación: {note.content.date} <span className="font-bold text-red-500">({calculateDaysDiff(note.content.date)} días)</span></p>}
                           {note.type === 'imagen' && <img src={note.content.text} alt="Nota" className="max-w-full rounded mt-2"/>}
