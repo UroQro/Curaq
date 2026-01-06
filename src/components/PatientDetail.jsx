@@ -1,225 +1,246 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { ArrowLeft, MoreVertical, Copy } from 'lucide-react';
-import { getLocalISODate } from '../constants';
-import NoteModal from './NoteModal';
+import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
+import { calculateAge, calculateDaysDiff, calculateBMI, getLocalISODate } from '../utils';
+import { ArrowLeft, Copy, Edit, Link as LinkIcon, Save, Trash2 } from 'lucide-react';
+import PatientFormModal from './PatientFormModal';
 
-export default function PatientDetail({ patient, onClose, user }) {
-  const [activeTab, setActiveTab] = useState('notes'); // info vs notes
-  const [showMenu, setShowMenu] = useState(false);
+export default function PatientDetail({ patient: initialPatient, onClose, user }) {
+  const [patient, setPatient] = useState(initialPatient);
+  const [showEdit, setShowEdit] = useState(false);
+  const [noteType, setNoteType] = useState('visita');
   
-  // Note Modal State
-  const [modalType, setModalType] = useState(null); // 'visita', 'labs', etc.
+  // FORM STATES
+  const [noteForm, setNoteForm] = useState({}); 
 
-  const today = getLocalISODate();
-  const isVisited = patient.lastVisitCheck === today;
+  // Reset form when type changes
+  useEffect(() => {
+      setNoteForm({});
+  }, [noteType]);
 
-  const toggleVisit = async () => {
-      await updateDoc(doc(db, 'patients', patient.id), { lastVisitCheck: isVisited ? null : today });
-  };
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "patients", initialPatient.id), (docSnapshot) => {
+        if (docSnapshot.exists()) setPatient({ id: docSnapshot.id, ...docSnapshot.data() });
+    });
+    return () => unsub();
+  }, [initialPatient.id]);
 
-  const handleAction = async (action) => {
-      setShowMenu(false);
-      if(action === 'prealta') {
-          await updateDoc(doc(db, 'patients', patient.id), { preDischarge: !patient.preDischarge });
-          alert(patient.preDischarge ? "Pre-Alta removida" : "Paciente marcado para Pre-Alta");
-      } else if (action === 'programar') {
-          const date = prompt("Ingrese la fecha de cirugía (YYYY-MM-DD):", today);
-          if(date) {
-             await updateDoc(doc(db, 'patients', patient.id), { status: 'scheduled', surgeryDate: date });
-             onClose();
-          }
-      } else if (action === 'egresar') {
-          // Checklists logic could be enforced here
-          if(confirm("¿Confirmar Egreso? Se moverá a la pestaña de Egresos.")) {
-             await updateDoc(doc(db, 'patients', patient.id), { status: 'discharged', dischargeDate: new Date().toISOString(), preDischarge: false });
-             onClose();
-          }
-      } else if (action === 'censo') {
-          await updateDoc(doc(db, 'patients', patient.id), { status: 'census' });
-          onClose();
-      }
-  };
+  const getUserName = () => user.displayName || user.email.split('@')[0];
 
-  const handleSaveNote = async (data) => {
+  const handleSaveNote = async () => {
+      if(Object.keys(noteForm).length === 0) return alert("Llena los campos");
       const newNote = {
           id: Date.now().toString(),
-          type: modalType,
-          author: user.displayName || 'Dr.',
+          type: noteType,
+          author: getUserName(),
           timestamp: new Date().toISOString(),
-          content: data
+          content: noteForm
       };
-      await updateDoc(doc(db, 'patients', patient.id), { notes: arrayUnion(newNote) });
-      setModalType(null);
+      await updateDoc(doc(db, "patients", patient.id), { notes: arrayUnion(newNote) });
+      setNoteForm({});
+      alert("Nota guardada");
   };
 
-  const updateClinical = async (e) => {
-      e.preventDefault();
-      const f = e.target;
-      const history = {
-          dm: f.dm.checked, has: f.has.checked, hipo: f.hipo.checked, onco: f.onco.checked,
-          text: f.histText.value, meds: f.meds.value, surgeries: f.surgeries.value
-      };
-      await updateDoc(doc(db, 'patients', patient.id), { phone: f.phone.value, history });
-      alert("Ficha actualizada");
+  const copyToWA = (n) => {
+      // WA Format Logic
+      let t = `*PACIENTE:* ${patient.name}\n*HOSPITAL:* ${patient.hospital}\n`;
+      const c = n.content;
+      if(n.type === 'visita'){
+          t += `*Subjetivo:* ${c.subj || '-'}\n`;
+          t += `*SV:* TA:${c.ta||'-'} | FC:${c.fc||'-'} | T:${c.temp||'-'}\n`;
+          t += `*Labs:* Hb:${c.hb||'-'} Leu:${c.leu||'-'} Cr:${c.cr||'-'}\n`;
+          t += `*Líq:* GU:${c.gu||'-'} | Dren:${c.drains||'-'}\n`;
+          t += `*PLAN:* ${c.plan||'-'}`;
+      } else {
+          t += `*Nota:* ${JSON.stringify(c)}`;
+      }
+      navigator.clipboard.writeText(t);
+      alert("Copiado para WhatsApp");
   };
+
+  const Input = ({ label, k, placeholder, type="text" }) => (
+      <div className="flex flex-col"><label className="text-[10px] uppercase font-bold text-gray-400">{label}</label><input type={type} className="border rounded p-1.5 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder={placeholder} value={noteForm[k] || ''} onChange={e=>setNoteForm({...noteForm, [k]: e.target.value})} /></div>
+  );
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans">
-        {/* HEADER */}
-        <div className="bg-white border-b sticky top-0 z-10">
-            <div className="flex justify-between items-center p-4">
-                <button onClick={onClose} className="text-blue-600 font-bold flex items-center gap-1"><ArrowLeft size={20}/> Atrás</button>
-                <div className="relative">
-                    <button onClick={()=>setShowMenu(!showMenu)} className="p-2 text-gray-500"><MoreVertical/></button>
-                    {showMenu && (
-                        <div className="absolute right-0 top-10 bg-white shadow-xl border rounded-xl w-48 py-2 z-20 animate-fade-in">
-                            {patient.status === 'census' ? (
-                                <>
-                                <button onClick={()=>handleAction('prealta')} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-purple-600 font-bold">
-                                    {patient.preDischarge ? 'Quitar Pre-Alta' : 'Marcar Pre-Alta'}
-                                </button>
-                                <button onClick={()=>handleAction('programar')} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-blue-600 font-bold">Programar Cirugía</button>
-                                <button onClick={()=>handleAction('egresar')} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-red-600 font-bold">Egresar Paciente</button>
-                                </>
-                            ) : (
-                                <button onClick={()=>handleAction('censo')} className="w-full text-left px-4 py-3 hover:bg-gray-50 text-gray-600 font-bold">Regresar al Censo</button>
-                            )}
+    <div className="bg-gray-50 dark:bg-slate-900 min-h-screen pb-20">
+      {/* HEADER */}
+      <div className="sticky top-0 z-20 bg-white dark:bg-slate-800 shadow-sm border-b dark:border-slate-700 p-3 flex items-center gap-3">
+          <button onClick={onClose}><ArrowLeft className="text-slate-600 dark:text-slate-300"/></button>
+          <div className="flex-1">
+              <h2 className="font-bold text-slate-900 dark:text-white leading-tight">{patient.name}</h2>
+              <p className="text-xs text-slate-500">{patient.hospital} • {calculateAge(patient.dob)}a • {patient.diagnosis}</p>
+          </div>
+          <button onClick={()=>setShowEdit(true)} className="p-2 bg-blue-50 text-blue-600 rounded-full"><Edit size={16}/></button>
+      </div>
+
+      <div className="p-3 space-y-4">
+          {/* INFO CARD */}
+          <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm shadow-sm">
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div><span className="font-bold block text-xs text-gray-400">TRATANTE</span>{patient.doctor}</div>
+                  <div><span className="font-bold block text-xs text-gray-400">SEGURO</span>{patient.insurance}</div>
+                  <div><span className="font-bold block text-xs text-gray-400">TELÉFONO</span><a href={`tel:${patient.phone}`} className="text-blue-500 underline">{patient.phone}</a></div>
+              </div>
+              <div className="border-t pt-2 mt-2 dark:border-slate-700">
+                  <span className="font-bold block text-xs text-gray-400 mb-1">ANTECEDENTES</span>
+                  <div className="flex flex-wrap gap-1 mb-1">
+                      {patient.antecedents?.dm && <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-bold">DM</span>}
+                      {patient.antecedents?.has && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px] font-bold">HAS</span>}
+                      {patient.antecedents?.onco && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px] font-bold">ONCO</span>}
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">{patient.antecedents?.other || 'Sin otros antecedentes'}</p>
+                  {patient.allergies && <p className="text-xs text-red-500 font-bold mt-1">ALERGIAS: {patient.allergies}</p>}
+              </div>
+          </div>
+
+          {/* NEW NOTE FORM */}
+          <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow border border-blue-200 dark:border-slate-600">
+              <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold text-sm text-blue-600 dark:text-blue-400">NUEVA NOTA</h3>
+                  <select className="text-xs p-1 border rounded bg-slate-50 dark:bg-slate-700 dark:text-white" value={noteType} onChange={e=>setNoteType(e.target.value)}>
+                      <option value="visita">Visita Diaria</option>
+                      <option value="check_qx">Verificación Qx</option>
+                      <option value="check_egreso">Checklist Egreso</option>
+                      <option value="labs">Laboratorios</option>
+                      <option value="vitales">Signos Vitales</option>
+                      <option value="sonda">Sonda / Catéter</option>
+                      <option value="urocultivo">Urocultivo</option>
+                      <option value="somato">Peso y Talla</option>
+                      <option value="vpo">VPO</option>
+                      <option value="imagen">Imagen (URL)</option>
+                      <option value="texto">Nota Libre</option>
+                  </select>
+              </div>
+
+              <div className="space-y-2 mb-3">
+                  {/* DYNAMIC INPUTS BASED ON TYPE */}
+                  {noteType === 'visita' && (
+                      <>
+                        <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white" placeholder="Subjetivo..." value={noteForm.subj||''} onChange={e=>setNoteForm({...noteForm, subj:e.target.value})}/>
+                        <div className="grid grid-cols-3 gap-2">
+                             <Input label="TA" k="ta"/> <Input label="FC" k="fc"/> <Input label="Temp" k="temp"/>
                         </div>
-                    )}
-                </div>
-            </div>
-            <div className="px-6 pb-4">
-                <h1 className="text-2xl font-black text-slate-800 leading-tight">{patient.name}</h1>
-                <p className="text-sm text-gray-500 mt-1">{patient.hospital} • {patient.doctor}</p>
-                <p className="text-sm font-bold text-blue-600 mt-1">{patient.diagnosis}</p>
-                {/* Visit Toggle */}
-                {patient.status === 'census' && (
-                    <div onClick={toggleVisit} className={`mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition-all ${isVisited ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs ${isVisited ? 'bg-blue-500' : 'bg-gray-300'}`}>✓</div>
-                        <span className={`text-xs font-bold ${isVisited ? 'text-blue-700' : 'text-gray-500'}`}>{isVisited ? 'Visita Realizada' : 'Marcar Visita'}</span>
-                    </div>
-                )}
-            </div>
-            {/* TABS */}
-            <div className="flex border-t">
-                <button onClick={()=>setActiveTab('notes')} className={`flex-1 py-3 text-xs font-bold tracking-wide ${activeTab==='notes'?'border-b-2 border-blue-600 text-blue-600':'text-gray-400'}`}>NOTAS Y EVOLUCIÓN</button>
-                <button onClick={()=>setActiveTab('info')} className={`flex-1 py-3 text-xs font-bold tracking-wide ${activeTab==='info'?'border-b-2 border-blue-600 text-blue-600':'text-gray-400'}`}>DATOS CLÍNICOS</button>
-            </div>
-        </div>
-
-        {/* CONTENT */}
-        <div className="flex-1 bg-gray-50 p-4 pb-20 overflow-y-auto">
-            
-            {activeTab === 'info' && (
-                <form onSubmit={updateClinical} className="bg-white p-5 rounded-xl shadow-sm space-y-4">
-                    <div><label className="text-xs font-bold text-gray-400 uppercase">Teléfono</label><input name="phone" defaultValue={patient.phone} placeholder="Contacto..." className="input-rounds" /></div>
-                    <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase">Antecedentes</label>
-                        <div className="flex gap-2 my-2 flex-wrap">
-                             <label className="chip"><input type="checkbox" name="dm" defaultChecked={patient.history?.dm} /> DM</label>
-                             <label className="chip"><input type="checkbox" name="has" defaultChecked={patient.history?.has} /> HAS</label>
-                             <label className="chip"><input type="checkbox" name="hipo" defaultChecked={patient.history?.hipo} /> HipoT</label>
-                             <label className="chip"><input type="checkbox" name="onco" defaultChecked={patient.history?.onco} /> Onco</label>
+                        <div className="grid grid-cols-2 gap-2">
+                             <Input label="Gasto U (ml)" k="gu"/> <Input label="Drenajes" k="drains"/>
                         </div>
-                        <textarea name="histText" defaultValue={patient.history?.text} placeholder="Alergias, otros..." className="input-rounds h-20"></textarea>
-                    </div>
-                    <div><label className="text-xs font-bold text-gray-400 uppercase">Cirugías Previas</label><textarea name="surgeries" defaultValue={patient.history?.surgeries} placeholder="Lista..." className="input-rounds h-20"></textarea></div>
-                    <div><label className="text-xs font-bold text-gray-400 uppercase">Medicamentos</label><textarea name="meds" defaultValue={patient.history?.meds} placeholder="Habituales..." className="input-rounds h-20"></textarea></div>
-                    <button className="btn-primary">Guardar Cambios</button>
-                </form>
-            )}
+                        <div className="p-2 bg-slate-50 dark:bg-slate-700 rounded border dark:border-slate-600">
+                            <p className="text-[10px] font-bold text-gray-400 mb-1">LABS RÁPIDOS</p>
+                            <div className="grid grid-cols-4 gap-1">
+                                <Input label="Hb" k="hb"/> <Input label="Leu" k="leu"/> <Input label="Cr" k="cr"/> <Input label="Glu" k="glu"/>
+                            </div>
+                        </div>
+                        <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white h-20" placeholder="Análisis y Plan..." value={noteForm.plan||''} onChange={e=>setNoteForm({...noteForm, plan:e.target.value})}/>
+                      </>
+                  )}
 
-            {activeTab === 'notes' && (
-                <div className="space-y-4">
-                    {/* Botonera de Notas */}
-                    <div className="grid grid-cols-4 gap-2 mb-4">
-                        <BtnNote onClick={()=>setModalType('visita')} label="Visita" color="bg-blue-50 text-blue-700"/>
-                        <BtnNote onClick={()=>setModalType('labs')} label="Labs" />
-                        <BtnNote onClick={()=>setModalType('signos')} label="Signos" />
-                        <BtnNote onClick={()=>setModalType('sonda')} label="Sonda" />
-                        <BtnNote onClick={()=>setModalType('urocultivo')} label="Urocultivo" />
-                        <BtnNote onClick={()=>setModalType('check_qx')} label="Check Qx" color="bg-green-50 text-green-700"/>
-                        <BtnNote onClick={()=>setModalType('check_egr')} label="Check Egr" color="bg-red-50 text-red-700"/>
-                        <BtnNote onClick={()=>setModalType('texto')} label="Nota Libre" />
-                    </div>
+                  {noteType === 'check_qx' && (
+                      <div className="space-y-1">
+                          {['Carta Seguro','Nota Internamiento','VPO','Laboratorios','Indicaciones Pre-Op','Confirmación Tel'].map(item => (
+                              <label key={item} className="flex items-center gap-2 text-sm dark:text-white">
+                                  <input type="checkbox" checked={noteForm[item]||false} onChange={e=>setNoteForm({...noteForm, [item]:e.target.checked})} /> {item}
+                              </label>
+                          ))}
+                      </div>
+                  )}
 
-                    {/* Timeline */}
-                    {patient.notes && patient.notes.slice().reverse().map((note, idx) => (
-                        <NoteCard key={idx} note={note} />
-                    ))}
-                    {(!patient.notes || patient.notes.length === 0) && <p className="text-center text-gray-400 text-sm mt-10">Sin notas registradas.</p>}
-                </div>
-            )}
-        </div>
+                  {noteType === 'check_egreso' && (
+                      <div className="space-y-1">
+                          {['Receta Entregada','Informe Médico','Nota de Egreso'].map(item => (
+                              <label key={item} className="flex items-center gap-2 text-sm dark:text-white">
+                                  <input type="checkbox" checked={noteForm[item]||false} onChange={e=>setNoteForm({...noteForm, [item]:e.target.checked})} /> {item}
+                              </label>
+                          ))}
+                      </div>
+                  )}
+                  
+                  {noteType === 'labs' && (
+                      <div className="grid grid-cols-3 gap-2">
+                          <Input label="Hb" k="hb"/> <Input label="Hto" k="htc"/> <Input label="Leu" k="leu"/> <Input label="Plq" k="plq"/>
+                          <Input label="Glu" k="glu"/> <Input label="Urea" k="urea"/> <Input label="BUN" k="bun"/> <Input label="Cr" k="cr"/>
+                          <Input label="Na" k="na"/> <Input label="K" k="k"/> <Input label="Cl" k="cl"/>
+                          <Input label="TP" k="tp"/> <Input label="TTP" k="ttp"/> <Input label="INR" k="inr"/>
+                      </div>
+                  )}
 
-        {/* NOTE MODAL */}
-        {modalType && <NoteModal type={modalType} onClose={()=>setModalType(null)} onSave={handleSaveNote} />}
+                  {noteType === 'vitales' && (
+                      <div className="flex gap-2">
+                          <Input label="TA" k="ta"/> <Input label="FR" k="fr"/> <Input label="Temp" k="temp"/>
+                      </div>
+                  )}
+
+                  {noteType === 'sonda' && (
+                      <div className="flex gap-2">
+                           <div className="flex-1"><label className="text-[10px] font-bold text-gray-400">Fecha Colocación</label><input type="date" className="w-full border rounded p-1.5 text-sm dark:bg-slate-700 dark:text-white" value={noteForm.date||''} onChange={e=>setNoteForm({...noteForm, date:e.target.value})}/></div>
+                      </div>
+                  )}
+
+                  {noteType === 'urocultivo' && (
+                      <div className="space-y-2">
+                          <select className="w-full border p-2 rounded dark:bg-slate-700 dark:text-white" onChange={e=>setNoteForm({...noteForm, res:e.target.value})}><option value="">Resultado...</option><option value="+">Positivo (+)</option><option value="-">Negativo (-)</option></select>
+                          {noteForm.res === '+' && (<><Input label="Microorganismo" k="germ"/><Input label="Sensibilidad" k="sens"/></>)}
+                      </div>
+                  )}
+
+                  {noteType === 'somato' && (
+                      <div className="flex gap-2 items-end">
+                          <Input label="Peso (kg)" k="w"/> <Input label="Talla (m)" k="h"/>
+                          <div className="text-sm font-bold p-2 bg-gray-100 rounded">IMC: {calculateBMI(noteForm.w, noteForm.h)}</div>
+                      </div>
+                  )}
+                  
+                  {noteType === 'vpo' && (
+                      <div className="space-y-2">
+                          <Input label="Médico que evalúa" k="doc"/>
+                          <Input label="Grupo ASA" k="asa"/>
+                      </div>
+                  )}
+
+                  {(noteType === 'texto' || noteType === 'imagen') && (
+                       <textarea className="w-full border rounded p-2 text-sm dark:bg-slate-700 dark:text-white h-20" placeholder={noteType==='imagen'?'Pegar URL...':'Escribir nota...'} value={noteForm.text||''} onChange={e=>setNoteForm({...noteForm, text:e.target.value})}/>
+                  )}
+              </div>
+
+              <button onClick={handleSaveNote} className="w-full bg-blue-600 text-white py-2 rounded font-bold shadow hover:bg-blue-700 flex justify-center items-center gap-2"><Save size={16}/> Guardar Nota</button>
+          </div>
+
+          {/* NOTE HISTORY */}
+          <div className="space-y-3">
+              {patient.notes?.slice().reverse().map(note => (
+                  <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded shadow-sm border border-gray-100 dark:border-slate-700 relative">
+                      <div className="flex justify-between items-center text-xs text-gray-400 mb-2 border-b pb-1">
+                          <span>{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
+                          <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
+                          <span className="font-bold text-blue-500">{note.author}</span>
+                      </div>
+                      <div className="text-sm text-slate-800 dark:text-slate-200">
+                          {/* RENDER CONTENT BASED ON TYPE */}
+                          {note.type === 'visita' && (
+                              <div className="space-y-1">
+                                  <p><span className="font-bold">S:</span> {note.content.subj}</p>
+                                  <div className="bg-slate-50 dark:bg-slate-700 p-1.5 rounded text-xs font-mono">
+                                      TA:{note.content.ta} FC:{note.content.fc} T:{note.content.temp} | GU:{note.content.gu}
+                                  </div>
+                                  <p className="font-medium text-blue-800 dark:text-blue-300">P: {note.content.plan}</p>
+                                  <button onClick={()=>copyToWA(note)} className="text-[10px] text-green-600 font-bold flex gap-1 items-center mt-1"><Copy size={10}/> Copiar WA</button>
+                              </div>
+                          )}
+                          {note.type.includes('check') && (
+                              <ul className="list-disc pl-4 text-xs">
+                                  {Object.entries(note.content).map(([k,v]) => v && <li key={k}>{k}</li>)}
+                              </ul>
+                          )}
+                          {note.type === 'sonda' && <p>Colocación: {note.content.date} <span className="font-bold text-red-500">({calculateDaysDiff(note.content.date)} días)</span></p>}
+                          {note.type === 'imagen' && <img src={note.content.text} alt="Nota" className="max-w-full rounded mt-2"/>}
+                          {!['visita','check_qx','check_egreso','sonda','imagen'].includes(note.type) && (
+                              <pre className="whitespace-pre-wrap font-sans">{JSON.stringify(note.content, null, 2).replace(/[{}"]/g,'')}</pre>
+                          )}
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+      {showEdit && <PatientFormModal onClose={() => {setShowEdit(false); onClose();}} mode="edit" initialData={patient} />}
     </div>
   );
 }
-
-const BtnNote = ({label, onClick, color="bg-white text-gray-600"}) => (
-    <button onClick={onClick} className={`${color} border shadow-sm rounded-lg py-2 text-[10px] font-bold uppercase hover:brightness-95 transition`}>{label}</button>
-);
-
-const NoteCard = ({note}) => {
-    const copyToWA = () => {
-        let t = '';
-        const c = note.content;
-        if(note.type === 'visita') {
-            t = `*REPORTE VISITA*\n*S:* ${c.subj}\n*SV:* TA ${c.ta} | FC ${c.fc} | T ${c.temp}\n*Líq:* GU ${c.gu}ml | Dren ${c.drains}\n*A/P:* ${c.plan}`;
-        } else {
-            t = JSON.stringify(c);
-        }
-        navigator.clipboard.writeText(t);
-        alert("Copiado");
-    };
-
-    return (
-        <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-400 relative">
-            <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase bg-gray-100 px-2 py-0.5 rounded text-gray-500">{note.type}</span>
-                <span className="text-[10px] text-gray-400">{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-            </div>
-            
-            <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                {note.type === 'visita' && (
-                    <>
-                    <p className="font-medium text-gray-900 mb-1">{note.content.subj}</p>
-                    <div className="bg-blue-50 p-2 rounded text-xs text-blue-800 grid grid-cols-2 gap-2 mb-2 font-mono">
-                        <span>TA: {note.content.ta}</span><span>FC: {note.content.fc}</span>
-                        <span>GU: {note.content.gu}</span><span>Dren: {note.content.drains}</span>
-                    </div>
-                    {/* Lab Grid Mini */}
-                    {(note.content.hb || note.content.leu) && (
-                         <div className="grid grid-cols-3 gap-1 text-[10px] bg-gray-100 p-1 rounded font-mono text-center mb-2">
-                             <span>Hb:{note.content.hb}</span><span>Leu:{note.content.leu}</span><span>Plq:{note.content.plq}</span>
-                             <span>Cr:{note.content.cr}</span><span>Glu:{note.content.glu}</span><span>Na:{note.content.na}</span>
-                         </div>
-                    )}
-                    <p className="italic text-gray-600">Plan: {note.content.plan}</p>
-                    </>
-                )}
-                {note.type.includes('check') && (
-                    <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(note.content).map(([k,v]) => (
-                            <div key={k} className="flex items-center gap-1 text-xs">
-                                <span>{v ? '✅' : '❌'}</span> <span className="capitalize">{k}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {note.type === 'texto' && <p>{note.content.text}</p>}
-                {note.type === 'sonda' && <p><strong>{note.content.type}</strong> colocada el {note.content.date}</p>}
-                {note.type === 'urocultivo' && <p className={note.content.result==='Positivo'?'text-red-600 font-bold':'text-green-600'}>Resultado: {note.content.result} {note.content.germ && `(${note.content.germ})`}</p>}
-            </div>
-            
-            <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                <span className="text-[10px] text-gray-300 uppercase font-bold">{note.author}</span>
-                {note.type === 'visita' && <button onClick={copyToWA} className="text-xs text-green-600 font-bold flex items-center gap-1 hover:bg-green-50 px-2 py-1 rounded transition"><Copy size={12}/> Copiar WA</button>}
-            </div>
-        </div>
-    );
-};

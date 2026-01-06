@@ -6,9 +6,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon.svg'],
       manifest: {
-        name: 'CURAQ Urología',
+        name: 'CURAQ Patient Management',
         short_name: 'CURAQ',
-        theme_color: '#2563eb',
+        theme_color: '#0f172a',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

@@ -1,49 +1,68 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
-import { Mail, Lock, HeartPulse } from 'lucide-react';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [masterKey, setMasterKey] = useState('');
   const [error, setError] = useState('');
-  const ADMIN_KEY = "Curaq8135892041";
+  
+  const REQUIRED_KEY = "Curaq8135892041";
 
-  const handleAuth = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault(); setError('');
-    try {
-        if(isRegistering) {
-            if(masterKey !== ADMIN_KEY) throw new Error("Clave maestra incorrecta");
-            const c = await createUserWithEmailAndPassword(auth, email, password);
-            await updateProfile(c.user, { displayName: name });
-        } else {
-            await signInWithEmailAndPassword(auth, email, password);
-        }
-    } catch (err) { setError(err.message); }
+    try { await signInWithEmailAndPassword(auth, email, password); } 
+    catch (err) { setError("Credenciales incorrectas o usuario no encontrado."); }
   };
 
+  const handleRegister = async (e) => {
+    e.preventDefault(); setError('');
+    if (masterKey !== REQUIRED_KEY) return setError("Clave maestra incorrecta.");
+    try { 
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: fullName });
+    } 
+    catch (err) { setError(err.message); }
+  };
+
+  const inputClass = "w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white transition-all";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="bg-white rounded-[2rem] shadow-xl w-full max-w-md p-8 flex flex-col items-center">
-        <div className="mb-4 bg-blue-50 p-4 rounded-full"><HeartPulse className="text-blue-600 w-12 h-12 stroke-[2]" /></div>
-        <h1 className="text-3xl font-black text-slate-800 mb-1">CURAQ</h1>
-        <p className="text-gray-400 font-medium mb-8">Gestión de Pacientes</p>
-        {error && <div className="bg-red-50 text-red-500 text-sm p-3 rounded-lg w-full mb-4 text-center">{error}</div>}
-        <form onSubmit={handleAuth} className="w-full space-y-4">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-900">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
+        <div className="text-center mb-8">
+            <h1 className="text-3xl font-black text-white tracking-tighter">CURAQ</h1>
+            <p className="text-blue-400 font-medium">Patient Management</p>
+        </div>
+        
+        {error && <div className="bg-red-900/50 text-red-200 p-3 rounded text-sm mb-4 border border-red-800 text-center font-bold">{error}</div>}
+        
+        <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
             {isRegistering && (
                 <>
-                <input type="text" placeholder="Nombre Completo" className="input-rounds" value={name} onChange={e=>setName(e.target.value)} required />
-                <input type="password" placeholder="Clave Maestra" className="input-rounds" value={masterKey} onChange={e=>setMasterKey(e.target.value)} required />
+                    <input type="text" value={fullName} onChange={e=>setFullName(e.target.value)} className={inputClass} placeholder="Nombre Completo" required />
+                    <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                        <label className="text-xs font-bold text-slate-400 block mb-1 uppercase">Clave de Acceso</label>
+                        <input type="password" value={masterKey} onChange={e=>setMasterKey(e.target.value)} className={inputClass} placeholder="Clave Proporcionada" required />
+                    </div>
                 </>
             )}
-            <div className="relative"><Mail className="absolute left-3 top-3.5 text-gray-400" size={18} /><input type="email" placeholder="correo@ejemplo.com" className="input-rounds pl-10" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
-            <div className="relative"><Lock className="absolute left-3 top-3.5 text-gray-400" size={18} /><input type="password" placeholder="••••••••" className="input-rounds pl-10" value={password} onChange={e=>setPassword(e.target.value)} required /></div>
-            <button type="submit" className="btn-primary">{isRegistering ? 'Crear Cuenta' : 'Iniciar Sesión'}</button>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className={inputClass} placeholder="Correo Electrónico" required />
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className={inputClass} placeholder="Contraseña" required />
+            
+            <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-3.5 rounded-lg font-bold shadow-lg transform transition active:scale-95">
+                {isRegistering ? 'Crear Usuario' : 'Iniciar Sesión'}
+            </button>
         </form>
-        <button onClick={() => {setIsRegistering(!isRegistering); setError('')}} className="mt-6 text-sm text-gray-500 font-medium hover:text-blue-600 transition">{isRegistering ? 'Ya tengo cuenta' : 'Crear usuario nuevo'}</button>
+        
+        <div className="mt-8 text-center pt-6 border-t border-slate-700">
+            <button onClick={() => {setIsRegistering(!isRegistering); setError('')}} className="text-sm text-slate-400 font-semibold hover:text-white transition">
+                {isRegistering ? '¿Ya tienes cuenta? Iniciar Sesión' : '¿No tienes cuenta? Registrarse'}
+            </button>
+        </div>
       </div>
     </div>
   );
