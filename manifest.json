@@ -1,20 +1,11 @@
 {
-  "name": "CURAQ Patient Management",
+  "name": "CURAQ Pro",
   "short_name": "CURAQ",
   "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#0d47a1",
+  "background_color": "#F2F2F7",
+  "theme_color": "#FFFFFF",
   "icons": [
-    {
-      "src": "https://via.placeholder.com/192x192.png?text=CURAQ",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "https://via.placeholder.com/512x512.png?text=CURAQ",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "https://via.placeholder.com/192/007AFF/ffffff?text=C", "sizes": "192x192", "type": "image/png" }
   ]
 }

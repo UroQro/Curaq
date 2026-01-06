@@ -1,451 +1,283 @@
 
-// IMPORT FIREBASE (Usando CDN Modular para evitar bundlers complejos en este zip)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
-import { 
-    getAuth, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged,
-    updateProfile
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-import { 
-    getFirestore, 
-    collection, 
-    addDoc, 
-    updateDoc, 
-    doc, 
-    onSnapshot, 
-    query, 
-    where, 
-    orderBy,
-    arrayUnion
-} from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-// --- CONFIGURACIÓN FIREBASE ---
+// --- CONFIG ---
 const firebaseConfig = {
   apiKey: "AIzaSyBdmVCQnUjDUXqwsiCPemJZ6u0fl5DhFAo",
   authDomain: "curaq-e3118.firebaseapp.com",
   projectId: "curaq-e3118",
   storageBucket: "curaq-e3118.firebasestorage.app",
   messagingSenderId: "849145373580",
-  appId: "1:849145373580:web:a6e0a5095db154e45d6ca9",
-  measurementId: "G-T17XP80GD1"
+  appId: "1:849145373580:web:a6e0a5095db154e45d6ca9"
 };
 
-// Inicialización
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// --- CONSTANTES Y DATA ---
 const ADMIN_KEY = "Curaq8135892041";
 
-const HOSPITALS = [
-    {name: "Hospital Star Médica", abbr: "STAR"}, {name: "Hospital Ángeles Querétaro", abbr: "HAQ"},
-    {name: "Hospital Ángeles Centro Sur", abbr: "HACS"}, {name: "Hospital H+", abbr: "HPLUS"},
-    {name: "Hospital San José", abbr: "HSJ"}, {name: "Hospital Moscati", abbr: "MOSC"},
-    {name: "Gestamed", abbr: "GESTA"}, {name: "Hospital Santa Rosa de Viterbo", abbr: "HSRV"},
-    {name: "Hospital Santo Tomás", abbr: "HST"}, {name: "Hospital Médica Ebor", abbr: "EBOR"},
-    {name: "Hospital Santiago de Querétaro", abbr: "HSQ"}, {name: "Hospital Jardines", abbr: "HJAR"},
-    {name: "Clínica San Francisco", abbr: "CSF"}, {name: "Hospital San Pedro", abbr: "HSP"},
-    {name: "Hospital del Sagrado Corazón", abbr: "HSC"}, {name: "Clínica Las Campanas", abbr: "CLC"},
-    {name: "Centro Médico Jurica", abbr: "CMJ"}, {name: "Clínica CER", abbr: "CER"},
-    {name: "Hospital Idaly Medical", abbr: "IDALY"}, {name: "Clínica de Especialidades Médicas", abbr: "CEM"},
-    {name: "Otro", abbr: "OTRO"}
-];
-
-const DOCTORS = ["Enrique Hans Mues Guizar", "Rolando L Bonilla Silva", "Otro"];
-
-const INSURANCES = [
-    {name: "Afirme", abbr: "AFIR"}, {name: "Allianz", abbr: "ALLI"}, {name: "Atlas", abbr: "ATLA"},
-    {name: "Atlantis", abbr: "ATLN"}, {name: "AXA", abbr: "AXA"}, {name: "Banorte", abbr: "BANO"},
-    {name: "Bupa", abbr: "BUPA"}, {name: "VUMI", abbr: "VUMI"}, {name: "Bx+ (Ve por Más)", abbr: "BX+"},
-    {name: "Chubb", abbr: "CHUB"}, {name: "General de Seguros", abbr: "GSEG"}, {name: "GNP", abbr: "GNP"},
-    {name: "Inbursa", abbr: "INBU"}, {name: "La Latino Seguros", abbr: "LALAT"}, {name: "Mapfre", abbr: "MAPF"},
-    {name: "MetLife", abbr: "METL"}, {name: "Pan-American México", abbr: "PANAM"}, {name: "Plan Seguro", abbr: "PLAN"},
-    {name: "Sisnova", abbr: "SISN"}, {name: "Prevem", abbr: "PREV"}, {name: "Seguros Monterrey New York Life", abbr: "SMNYL"},
-    {name: "Sura", abbr: "SURA"}, {name: "Particular", abbr: "PART"}, {name: "Paquete", abbr: "PAQ"},
-    {name: "Otro", abbr: "OTRO"}
-];
-
-// --- ESTADO GLOBAL ---
-let currentUser = null;
-let patientsUnsub = null;
-let currentPatientId = null;
-
-// --- UTILS ---
+// --- HELPERS ---
 const $ = id => document.getElementById(id);
-const hide = id => $(id).classList.add('hidden');
-const show = id => $(id).classList.remove('hidden');
+const hide = id => $(id)?.classList.add('hidden');
+const show = id => $(id)?.classList.remove('hidden');
+const getToday = () => new Date().toISOString().split('T')[0];
 
-function calculateAge(dob) {
-    if(!dob) return '';
-    const diff = Date.now() - new Date(dob).getTime();
-    const ageDate = new Date(diff);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast'; t.textContent = msg;
+    $('toast-box').appendChild(t);
+    setTimeout(() => t.remove(), 3000);
 }
 
-function getTodayStr() {
-    return new Date().toISOString().split('T')[0];
+// --- ROUTER (Navegación sin recargar) ---
+// Manejamos las vistas cambiando la URL (hash)
+window.addEventListener('hashchange', handleRoute);
+window.addEventListener('load', handleRoute);
+
+function handleRoute() {
+    const hash = window.location.hash;
+    
+    // Ocultar todas las pantallas principales
+    document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+
+    if (!auth.currentUser) {
+        show('view-auth');
+        return;
+    }
+
+    if (hash.startsWith('#patient/')) {
+        // Vista de Detalle
+        const id = hash.split('/')[1];
+        loadPatientDetail(id);
+        show('view-detail');
+    } else {
+        // Vista Dashboard (Default)
+        show('view-dashboard');
+        // Reset tab view if coming back
+        if(window.currentTab) activateTab(window.currentTab);
+    }
 }
+
+function navigateTo(route) { window.location.hash = route; }
 
 // --- AUTH LOGIC ---
-onAuthStateChanged(auth, (user) => {
-    hide('loading-screen');
+onAuthStateChanged(auth, user => {
+    hide('loader-overlay');
     if (user) {
-        currentUser = user;
-        $('user-display-name').textContent = user.displayName || user.email;
-        show('app');
-        hide('auth-view');
-        show('dashboard-view');
-        initRealtimeData();
+        $('user-initials').textContent = (user.displayName || 'U').substring(0,2).toUpperCase();
+        handleRoute(); // Refrescar ruta
+        initListeners();
     } else {
-        currentUser = null;
-        show('app');
-        show('auth-view');
-        hide('dashboard-view');
-        if(patientsUnsub) patientsUnsub();
+        show('view-auth');
+        hide('view-dashboard');
+        hide('view-detail');
     }
 });
 
-// Eventos Auth
-$('btn-goto-register').onclick = () => { hide('login-form'); show('register-form'); };
-$('btn-goto-login').onclick = () => { hide('register-form'); show('login-form'); };
-
-$('login-form').onsubmit = (e) => {
+$('form-login').onsubmit = e => {
     e.preventDefault();
-    const email = $('login-email').value;
-    const pass = $('login-password').value;
-    signInWithEmailAndPassword(auth, email, pass).catch(err => alert(err.message));
+    signInWithEmailAndPassword(auth, $('auth-email').value, $('auth-pass').value)
+        .catch(err => showToast(err.message));
 };
 
-$('register-form').onsubmit = (e) => {
+$('form-register').onsubmit = e => {
     e.preventDefault();
-    const key = $('reg-key').value;
-    if(key !== ADMIN_KEY) return alert("Clave maestra incorrecta.");
-
-    const email = $('reg-email').value;
-    const pass = $('reg-password').value;
-    const name = $('reg-name').value;
-
-    createUserWithEmailAndPassword(auth, email, pass)
-        .then(creds => updateProfile(creds.user, { displayName: name }))
-        .catch(err => alert(err.message));
+    if($('reg-key').value !== ADMIN_KEY) return showToast('Clave incorrecta');
+    createUserWithEmailAndPassword(auth, $('reg-email').value, $('reg-pass').value)
+        .then(creds => updateProfile(creds.user, {displayName: $('reg-name').value}))
+        .catch(err => showToast(err.message));
 };
 
-$('btn-logout').onclick = () => signOut(auth);
+$('btn-toggle-reg').onclick = () => { hide('form-login'); show('form-register'); };
+$('btn-toggle-login').onclick = () => { hide('form-register'); show('form-login'); };
 
-// --- NAVEGACIÓN TABS ---
-document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.onclick = () => {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        $(`tab-${btn.dataset.target}`).classList.add('active');
-    };
+// --- DASHBOARD & LISTS ---
+let patientsCache = [];
+
+function initListeners() {
+    onSnapshot(collection(db, 'patients'), snapshot => {
+        patientsCache = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        renderLists();
+    });
+}
+
+function renderLists() {
+    const lists = { census: $('list-census'), schedule: $('list-schedule'), discharges: $('list-discharges') };
+    Object.values(lists).forEach(l => l.innerHTML = '');
+    
+    const hospFilter = $('sel-hospital').value;
+    const today = getToday();
+    let hasCensus = false;
+
+    patientsCache.forEach(p => {
+        // Render Censo
+        if (p.status === 'census') {
+            if (hospFilter && p.hospital !== hospFilter) return;
+            hasCensus = true;
+            
+            // Logic Colors
+            let statusClass = 'status-red'; // Pendiente
+            if (p.lastVisitCheck === today) statusClass = 'status-blue'; // Visitado
+            if (p.preDischarge) statusClass = 'status-purple'; // Prealta
+            
+            lists.census.appendChild(createRow(p, statusClass));
+        } 
+        // Render Schedule
+        else if (p.status === 'scheduled') {
+            const isToday = p.surgeryDate === today;
+            lists.schedule.appendChild(createRow(p, 'status-blue', isToday ? '' : '(opacity:0.6)'));
+        }
+        // Render Discharges
+        else if (p.status === 'discharged') {
+            lists.discharges.appendChild(createRow(p, 'status-gray'));
+        }
+    });
+
+    if(!hasCensus) show('empty-state'); else hide('empty-state');
+}
+
+function createRow(p, statusClass, style='') {
+    const li = document.createElement('li');
+    li.className = `patient-row ${statusClass}`;
+    li.style = style;
+    li.onclick = () => navigateTo(`patient/${p.id}`); // ROUTER CLICK
+    
+    // Initials
+    const initials = p.name.split(' ').map(n=>n[0]).join('').substring(0,2);
+    
+    li.innerHTML = `
+        <div class="row-status-bar"></div>
+        <div class="p-avatar">${initials}</div>
+        <div class="p-info">
+            <div class="p-name">${p.name}</div>
+            <span class="p-desc">${p.diagnosis}</span>
+        </div>
+        <span class="p-badge">${p.hospital}</span>
+        <i class="fas fa-chevron-right" style="color:#ccc; margin-left:8px; font-size:0.8rem"></i>
+    `;
+    return li;
+}
+
+// --- TABS DASHBOARD ---
+window.currentTab = 'census';
+document.querySelectorAll('.tab-link').forEach(btn => {
+    btn.onclick = () => activateTab(btn.dataset.tab);
 });
 
-// --- RENDERIZADO DE PACIENTES ---
-function initRealtimeData() {
-    const q = query(collection(db, "patients")); 
+function activateTab(tab) {
+    window.currentTab = tab;
+    // UI Tabs
+    document.querySelectorAll('.tab-link').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
     
-    patientsUnsub = onSnapshot(q, (snapshot) => {
-        const censusList = $('census-list');
-        const scheduleList = $('schedule-list');
-        const dischargeList = $('discharge-list');
-        
-        censusList.innerHTML = '';
-        scheduleList.innerHTML = '';
-        dischargeList.innerHTML = '';
-
-        const filterHosp = $('filter-hospital').value;
-        const filterDoc = $('filter-doctor').value;
-
-        const today = getTodayStr();
-
-        snapshot.forEach(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            
-            // Filtros de Censo
-            if (p.status === 'census') {
-                if (filterHosp && p.hospital !== filterHosp) return;
-                if (filterDoc && p.doctor !== filterDoc) return;
-                
-                // Lógica de Colores y Checkbox
-                let cardClass = 'status-red';
-                let isChecked = false;
-
-                // Reinicio de media noche (Si la fecha guardada no es hoy, es rojo)
-                if (p.lastVisitCheck === today) {
-                    cardClass = 'status-blue';
-                    isChecked = true;
-                }
-                
-                if (p.preDischarge) cardClass = 'status-purple';
-
-                const card = createCard(p, cardClass, isChecked);
-                censusList.appendChild(card);
-            }
-            else if (p.status === 'scheduled') {
-                // Opacidad según fecha
-                let opacityClass = 'opacity-75';
-                if (p.surgeryDate === today) opacityClass = 'opacity-100';
-                
-                const card = createCard(p, opacityClass, false);
-                scheduleList.appendChild(card);
-            }
-            else if (p.status === 'discharged') {
-                const card = createCardDischarged(p);
-                dischargeList.appendChild(card);
-            }
-        });
-    });
-}
-
-function createCard(p, statusClass, isChecked) {
-    const div = document.createElement('div');
-    div.className = `patient-card ${statusClass}`;
-    div.innerHTML = `
-        <div class="card-header">
-            <span class="hosp-badge">${p.hospital}</span>
-            ${p.status === 'census' ? 
-                `<input type="checkbox" class="visit-checkbox" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleVisit('${p.id}', this.checked)">` 
-                : ''}
-        </div>
-        <div class="card-body" onclick="openDetails('${p.id}')">
-            <h3>${p.name}</h3>
-            <p><strong>Edad:</strong> ${calculateAge(p.dob)} | <strong>Seguro:</strong> ${p.insurance}</p>
-            <p><strong>Dx:</strong> ${p.diagnosis}</p>
-            <p><strong>Dr:</strong> ${p.doctor}</p>
-            ${p.status === 'scheduled' ? `<p><strong>Fecha Qx:</strong> ${p.surgeryDate}</p>` : ''}
-        </div>
-        <div class="card-actions">
-            ${p.status === 'census' ? `
-                <button class="btn-card" onclick="event.stopPropagation(); setPreDischarge('${p.id}', ${!p.preDischarge})">Pre-Alta</button>
-                <button class="btn-card" onclick="event.stopPropagation(); openScheduler('${p.id}')">Programar</button>
-                <button class="btn-card" onclick="event.stopPropagation(); dischargePatient('${p.id}')">Egresar</button>
-            ` : ''}
-            ${p.status === 'scheduled' ? `
-                <button class="btn-card" onclick="event.stopPropagation(); returnToCensus('${p.id}')">Al Censo</button>
-                <button class="btn-card" onclick="event.stopPropagation(); dischargePatient('${p.id}')">Egresar</button>
-            ` : ''}
-        </div>
-    `;
-    return div;
-}
-
-function createCardDischarged(p) {
-    const div = document.createElement('div');
-    div.className = "patient-card status-blue";
-    div.innerHTML = `
-        <div class="card-header"><span class="hosp-badge">${p.hospital}</span></div>
-        <h3>${p.name}</h3>
-        <p>Egreso: ${p.dischargeDate || 'N/A'}</p>
-        <p>Seguro: ${p.insurance}</p>
-        <label><input type="checkbox" ${p.insurancePaperwork ? 'checked' : ''} onclick="togglePaperwork('${p.id}', this.checked)"> Trámite Aseguradora</label>
-        <div class="card-actions">
-            <button class="btn-card" onclick="returnToCensus('${p.id}')">Reingresar al Censo</button>
-        </div>
-    `;
-    return div;
-}
-
-// --- ACCIONES CRUD ---
-
-// Lógica de Visita (Checkbox)
-window.toggleVisit = async (id, checked) => {
-    const today = getTodayStr();
-    await updateDoc(doc(db, "patients", id), {
-        lastVisitCheck: checked ? today : null
-    });
-};
-
-window.setPreDischarge = async (id, val) => {
-    await updateDoc(doc(db, "patients", id), { preDischarge: val });
-};
-
-window.dischargePatient = async (id) => {
-    if(!confirm("¿Egresar paciente?")) return;
-    await updateDoc(doc(db, "patients", id), {
-        status: 'discharged',
-        dischargeDate: getTodayStr(),
-        preDischarge: false
-    });
-};
-
-window.returnToCensus = async (id) => {
-    await updateDoc(doc(db, "patients", id), { status: 'census' });
-};
-
-window.togglePaperwork = async (id, val) => {
-    await updateDoc(doc(db, "patients", id), { insurancePaperwork: val });
-};
-
-// Crear Paciente / Programar
-const patModal = $('modal-patient');
-$('fab-add-census').onclick = () => openPatModal('census');
-$('fab-add-schedule').onclick = () => openPatModal('schedule');
-
-window.openScheduler = (id) => {
-    // Busca datos existentes y abre modal en modo schedule
-    // Para simplificar en este script: abre modal vacío, usuario llena rápido
-    // Idealmente: fetch doc -> fill form -> show
-    alert("Para mover a programación, edite la ficha y seleccione una fecha.");
-};
-
-function openPatModal(mode) {
-    $('form-patient').reset();
-    patModal.classList.add('active');
-    $('group-schedule-date').classList.toggle('hidden', mode !== 'schedule');
-    $('pat-schedule-date').required = (mode === 'schedule');
-}
-
-$('form-patient').onsubmit = async (e) => {
-    e.preventDefault();
+    // UI Lists
+    document.querySelectorAll('.patient-list').forEach(l => l.classList.add('hidden'));
+    $(`list-${tab}`).classList.remove('hidden');
     
-    // Obtener valores de los Selects/Others
-    const getVal = (selId, otherId) => {
-        const v = $(selId).value;
-        return (v === 'OTRO' || v === 'Otro') ? $(otherId).value : v;
-    };
+    $('header-label').textContent = (tab === 'census' ? 'Censo' : (tab === 'schedule' ? 'Agenda' : 'Egresos'));
+    
+    // Show/Hide filters
+    if(tab==='census') { show('filter-bar'); show('fab-add'); } 
+    else if (tab==='schedule') { hide('filter-bar'); show('fab-add'); }
+    else { hide('filter-bar'); hide('fab-add'); }
+}
 
-    const data = {
-        hospital: getVal('pat-hospital', 'pat-hospital-other').substring(0,4).toUpperCase(),
-        name: $('pat-name').value,
-        dob: $('pat-dob').value,
-        caseType: $('pat-case-type').value,
-        diagnosis: $('pat-diagnosis').value,
-        doctor: getVal('pat-doctor', 'pat-doctor-other'),
-        insurance: getVal('pat-insurance', 'pat-insurance-other').substring(0,4).toUpperCase(),
-        status: $('pat-schedule-date').value ? 'scheduled' : 'census',
-        surgeryDate: $('pat-schedule-date').value || null,
-        preDischarge: false,
-        lastVisitCheck: null,
-        insurancePaperwork: false
-    };
+// --- DETAIL VIEW LOGIC ---
+let currentPatientId = null;
 
-    try {
-        await addDoc(collection(db, "patients"), data);
-        patModal.classList.remove('active');
-    } catch(err) { alert(err.message); }
-};
-
-// --- DETALLES Y NOTAS ---
-const detModal = $('modal-details');
-window.openDetails = (id) => {
+async function loadPatientDetail(id) {
     currentPatientId = id;
-    // Snapshot para datos en tiempo real de un solo doc
-    onSnapshot(doc(db, "patients", id), (docSnap) => {
-        if(!docSnap.exists()) return;
-        const p = docSnap.data();
-        $('det-name').textContent = p.name;
-        $('det-age').textContent = calculateAge(p.dob) + ' años';
-        $('det-hospital').textContent = p.hospital;
-        $('det-insurance').textContent = p.insurance;
-
-        // Populate fields
-        $('det-phone').value = p.phone || '';
-        if(p.history) {
-            $('ant-dm').checked = p.history.dm;
-            $('ant-has').checked = p.history.has;
-            $('ant-hipo').checked = p.history.hipo;
-            $('ant-onco').checked = p.history.onco;
-            $('det-history-text').value = p.history.text || '';
-            $('det-meds').value = p.history.meds || '';
-            $('det-surgeries').value = p.history.surgeries || '';
-        }
-
-        renderNotes(p.notes || []);
-    });
-    detModal.classList.add('active');
-};
-
-$('btn-save-meta').onclick = async () => {
-    if(!currentPatientId) return;
-    const history = {
-        dm: $('ant-dm').checked,
-        has: $('ant-has').checked,
-        hipo: $('ant-hipo').checked,
-        onco: $('ant-onco').checked,
-        text: $('det-history-text').value,
-        meds: $('det-meds').value,
-        surgeries: $('det-surgeries').value
-    };
-    await updateDoc(doc(db, "patients", currentPatientId), {
-        phone: $('det-phone').value,
-        history: history
-    });
-    alert("Ficha actualizada");
-};
-
-// --- GESTOR DE NOTAS ---
-window.app = {}; // Namespace global para onclicks
-window.app.openNoteModal = (type) => {
-    const m = $('modal-note-editor');
-    const container = $('note-fields-container');
-    const form = $('form-note');
-    const title = $('note-editor-title');
-    const waBtn = $('btn-copy-wa');
+    const p = patientsCache.find(x => x.id === id);
+    if(!p) return; // O fetch getDoc si no está en cache
     
-    container.innerHTML = '';
-    form.dataset.type = type;
-    waBtn.classList.add('hidden');
-    m.classList.add('active');
+    // Header
+    $('d-name').textContent = p.name;
+    $('d-avatar').textContent = p.name.substring(0,2).toUpperCase();
+    $('d-age').textContent = calculateAge(p.dob);
+    $('d-hosp').textContent = p.hospital;
+    $('d-insurance').textContent = p.insurance;
+    $('d-doctor').textContent = p.doctor.split(' ')[0]; // Solo primer nombre para badge
+    $('d-diagnosis').textContent = p.diagnosis;
+    $('d-phone-text').textContent = p.phone || 'Agregar';
+    $('link-phone').href = p.phone ? `tel:${p.phone}` : '#';
+    
+    // Visit Checkbox logic
+    $('d-check-visit').checked = (p.lastVisitCheck === getToday());
+    
+    // Chips Antecedentes
+    const h = p.history || {};
+    $('chip-dm').className = `chip ${h.dm ? 'active' : ''}`;
+    $('chip-has').className = `chip ${h.has ? 'active' : ''}`;
+    $('chip-onco').className = `chip ${h.onco ? 'active' : ''}`;
+    $('d-history').value = h.text || '';
+    
+    renderTimeline(p.notes || []);
+    
+    // Reset Tab
+    app.setDetailTab('info');
+}
 
-    if (type === 'visita') {
-        title.textContent = "Visita Diaria";
-        waBtn.classList.remove('hidden');
+// --- DETAIL ACTIONS ---
+$('btn-back').onclick = () => window.history.back(); // Regresar nativo
+$('d-check-visit').onclick = (e) => {
+    updateDoc(doc(db, 'patients', currentPatientId), {
+        lastVisitCheck: e.target.checked ? getToday() : null
+    });
+};
+$('btn-save-history').onclick = () => {
+    updateDoc(doc(db, 'patients', currentPatientId), {
+        'history.text': $('d-history').value,
+        'phone': $('d-phone-edit').value || $('d-phone-text').textContent
+    }).then(() => showToast('Datos actualizados'));
+};
+
+// Menu de acciones (Egresar, Prealta)
+$('btn-detail-menu').onclick = () => {
+    // Simple confirm for demo
+    const action = prompt("Escriba: 'alta' para egresar, 'prealta' para marcar, 'borrar' para eliminar");
+    if(action === 'alta') {
+        updateDoc(doc(db, 'patients', currentPatientId), { status: 'discharged', dischargeDate: getToday() });
+        window.history.back();
+    } else if (action === 'prealta') {
+        updateDoc(doc(db, 'patients', currentPatientId), { preDischarge: true });
+        showToast('Marcado como Pre-Alta');
+    }
+};
+
+// --- NOTES LOGIC ---
+window.app = window.app || {};
+app.setDetailTab = (tab) => {
+    document.querySelectorAll('.d-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.d-panel').forEach(p => p.classList.remove('active'));
+    
+    // Find button by text mostly or index (simplification)
+    // In production use IDs for tabs
+    const tabBtn = Array.from(document.querySelectorAll('.d-tab')).find(b => b.textContent.includes(tab === 'info' ? 'Datos' : 'Notas'));
+    if(tabBtn) tabBtn.classList.add('active');
+    
+    $(`d-tab-${tab}`).classList.add('active');
+};
+
+app.newNote = (type) => {
+    const form = $('form-note');
+    const container = $('note-dynamic-fields');
+    form.dataset.type = type;
+    $('modal-note').classList.remove('hidden');
+    
+    $('note-title').textContent = type.toUpperCase();
+    
+    if(type === 'visita') {
         container.innerHTML = `
-            <input type="text" name="subj" placeholder="Subjetivo">
-            <input type="text" name="signos" placeholder="Signos Vitales">
-            <input type="text" name="labs" placeholder="Laboratorios">
-            <input type="text" name="gasto" placeholder="Gasto Urinario/Drenaje">
-            <textarea name="analisis" placeholder="Análisis y Plan"></textarea>
+            <div class="field"><input name="subj" placeholder="Subjetivo"></div>
+            <div class="field"><input name="obj" placeholder="Objetivo / Signos"></div>
+            <div class="field"><textarea name="plan" class="input-area" placeholder="Análisis y Plan"></textarea></div>
         `;
-    } else if (type === 'verif_qx') {
-        title.textContent = "Verificación Quirúrgica";
-        container.innerHTML = `
-            <label><input type="checkbox" name="carta"> Carta Seguro</label>
-            <label><input type="checkbox" name="nota_int"> Nota Internamiento</label>
-            <label><input type="checkbox" name="vpo"> VPO</label>
-            <label><input type="checkbox" name="labs"> Laboratorios</label>
-            <label><input type="checkbox" name="ind_pre"> Indicaciones Pre-Op</label>
-            <label><input type="checkbox" name="conf_tel"> Confirmación Telefónica</label>
-        `;
-    } else if (type === 'verif_egreso') {
-        title.textContent = "Verificación de Egreso";
-        container.innerHTML = `
-            <label><input type="checkbox" name="receta"> Receta Entregada</label>
-            <label><input type="checkbox" name="informe"> Informe Médico</label>
-            <label><input type="checkbox" name="nota_egr"> Nota de Egreso</label>
-        `;
-    } else if (type === 'labs') {
-        title.textContent = "Nota de Laboratorios";
-        container.innerHTML = `
-            <div class="row"><input name="hb" placeholder="Hb"><input name="htc" placeholder="Htc"></div>
-            <div class="row"><input name="leu" placeholder="Leucocitos"><input name="plaq" placeholder="Plaquetas"></div>
-            <div class="row"><input name="glu" placeholder="Glucosa"><input name="urea" placeholder="Urea"></div>
-            <div class="row"><input name="bun" placeholder="BUN"><input name="creat" placeholder="Creatinina"></div>
-            <div class="row"><input name="na" placeholder="Na"><input name="k" placeholder="K"><input name="cl" placeholder="Cl"></div>
-            <div class="row"><input name="tp" placeholder="TP"><input name="ttp" placeholder="TTP"><input name="inr" placeholder="INR"></div>
-        `;
-    } else if (type === 'vpo') {
-        title.textContent = "Nota VPO";
-        container.innerHTML = `
-             <input type="text" name="medico" placeholder="Médico que realizó VPO">
-             <input type="date" name="fecha">
-             <input type="text" name="asa" placeholder="Grupo ASA">
-        `;
-    } else if (type === 'libre') {
-        title.textContent = "Nota Libre";
-        container.innerHTML = `<textarea name="texto" placeholder="Escriba su nota..."></textarea>`;
-    } 
-    // ... (Se pueden agregar el resto de tipos siguiendo el mismo patrón)
-    else {
-        container.innerHTML = `<textarea name="texto" placeholder="Detalles..."></textarea>`;
+        show('btn-wa');
+    } else {
+        container.innerHTML = `<div class="field"><textarea name="text" class="input-area" placeholder="Escriba aquí..."></textarea></div>`;
+        hide('btn-wa');
     }
 };
 
@@ -453,113 +285,97 @@ $('form-note').onsubmit = async (e) => {
     e.preventDefault();
     const type = e.target.dataset.type;
     const formData = new FormData(e.target);
-    const noteData = Object.fromEntries(formData.entries());
+    const data = Object.fromEntries(formData);
     
-    // Checkboxes handling
-    if(type === 'verif_qx' || type === 'verif_egreso') {
-        e.target.querySelectorAll('input[type="checkbox"]').forEach(chk => {
-            noteData[chk.name] = chk.checked;
-        });
-    }
-
-    const newNote = {
-        type: type,
-        author: currentUser.displayName,
-        timestamp: new Date().toISOString(),
-        data: noteData
-    };
-
-    await updateDoc(doc(db, "patients", currentPatientId), {
-        notes: arrayUnion(newNote)
+    await updateDoc(doc(db, 'patients', currentPatientId), {
+        notes: arrayUnion({
+            type, data, author: auth.currentUser.displayName, timestamp: new Date().toISOString()
+        })
     });
-    
-    $('modal-note-editor').classList.remove('active');
+    $('modal-note').classList.add('hidden');
 };
 
-// Generador de Texto para WhatsApp (Visita)
-$('btn-copy-wa').onclick = () => {
-    const f = new FormData($('form-note'));
-    const txt = `*REPORTE CURAQ*
-Pac: ${$('det-name').textContent}
-
-*Subj:* ${f.get('subj')}
-*Signos:* ${f.get('signos')}
-*Labs:* ${f.get('labs')}
-*Gasto:* ${f.get('gasto')}
-*Plan:* ${f.get('analisis')}`;
-    navigator.clipboard.writeText(txt).then(() => alert("Copiado al portapapeles"));
+$('btn-wa').onclick = () => {
+    const form = new FormData($('form-note'));
+    const txt = `*PACIENTE:* ${$('d-name').textContent}\n*S:* ${form.get('subj')}\n*O:* ${form.get('obj')}\n*A/P:* ${form.get('plan')}`;
+    navigator.clipboard.writeText(txt);
+    showToast('Copiado para WhatsApp');
 };
 
-function renderNotes(notes) {
-    const tl = $('notes-timeline');
-    tl.innerHTML = '';
-    // Ordenar descendente
-    const sorted = [...notes].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    sorted.forEach(n => {
+function renderTimeline(notes) {
+    const box = $('timeline-box');
+    box.innerHTML = '';
+    notes.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(n => {
         const d = new Date(n.timestamp);
-        const dateStr = `${d.getDate()}/${d.getMonth()+1} ${d.getHours()}:${d.getMinutes()}`;
+        let body = '';
+        if(n.type === 'visita') body = `<b>S:</b> ${n.data.subj}<br><b>P:</b> ${n.data.plan}`;
+        else body = n.data.text || JSON.stringify(n.data);
         
-        let content = '';
-        if(n.type === 'visita') {
-            content = `Subj: ${n.data.subj}
-Plan: ${n.data.analisis}`;
-        } else if (n.type === 'labs') {
-            content = `Hb: ${n.data.hb} | Leu: ${n.data.leu} | Cr: ${n.data.creat}`;
-        } else if (n.type === 'libre') {
-            content = n.data.texto;
-        } else {
-            content = JSON.stringify(n.data).replace(/["{}]/g, '').replace(/,/g, '\n');
-        }
-
         const div = document.createElement('div');
         div.className = 'timeline-item';
         div.innerHTML = `
-            <div class="timeline-meta">
-                <span>${n.author || 'Usuario'}</span>
-                <span>${dateStr}</span>
-            </div>
-            <div class="timeline-body"><strong>${n.type.toUpperCase()}</strong>: ${content}</div>
+            <div class="tm-meta"><span>${n.type.toUpperCase()}</span> <span>${d.toLocaleDateString()}</span></div>
+            <div class="tm-body">${body}</div>
         `;
-        tl.appendChild(div);
+        box.appendChild(div);
     });
 }
 
-// --- POPULATE DROPDOWNS ---
-const populate = (id, arr) => {
-    const s = $(id);
-    arr.forEach(x => {
-        const val = x.abbr || x; // Handle object or string
-        const txt = x.name || x;
-        const opt = document.createElement('option');
-        opt.value = val;
-        opt.textContent = txt;
-        s.appendChild(opt);
-    });
-    // Manejo de "Otros"
-    s.onchange = (e) => {
-        const otherInput = $(id + '-other');
-        if(otherInput) {
-            if(e.target.value === 'OTRO' || e.target.value === 'Otro') otherInput.classList.remove('hidden');
-            else otherInput.classList.add('hidden');
-        }
-    };
+// --- ADD PATIENT ---
+$('fab-add').onclick = () => {
+    $('form-add').reset();
+    $('modal-add').classList.remove('hidden');
 };
-
-populate('pat-hospital', HOSPITALS);
-populate('filter-hospital', HOSPITALS);
-populate('pat-doctor', DOCTORS);
-populate('filter-doctor', DOCTORS);
-populate('pat-insurance', INSURANCES);
-
-// --- CSV DOWNLOAD ---
-$('btn-download-csv').onclick = async () => {
-    // Descarga simple de colección
-    // Nota: en producción esto debe ser paginado si son muchos datos
-    alert("Función preparada para conectar historial completo.");
-};
-
-// Close Modals
-document.querySelectorAll('.close-modal').forEach(x => x.onclick = () => {
-    document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+document.querySelectorAll('.close-modal, .close-modal-note').forEach(b => b.onclick = function() {
+    this.closest('.modal-overlay').classList.add('hidden');
 });
+
+// Logic for Scheduled toggle
+$('chk-schedule-mode').onchange = (e) => {
+    if(e.target.checked) show('box-schedule-date'); else hide('box-schedule-date');
+};
+
+$('form-add').onsubmit = async (e) => {
+    e.preventDefault();
+    const isSched = $('chk-schedule-mode').checked;
+    
+    const data = {
+        hospital: $('add-hospital').value,
+        name: $('add-name').value,
+        dob: $('add-dob').value,
+        type: $('add-type').value,
+        diagnosis: $('add-diagnosis').value,
+        doctor: $('add-doctor').value,
+        insurance: $('add-insurance').value,
+        status: isSched ? 'scheduled' : 'census',
+        surgeryDate: isSched ? $('add-qx-date').value : null,
+        lastVisitCheck: null,
+        preDischarge: false
+    };
+    
+    try {
+        await addDoc(collection(db, 'patients'), data);
+        $('modal-add').classList.add('hidden');
+        showToast('Paciente Agregado');
+    } catch(err) { showToast(err.message); }
+};
+
+// --- POPULATE SELECTS ---
+const HOSPITALS = ["Hospital Star Médica","Hospital Ángeles Querétaro","Hospital Ángeles Centro Sur","Hospital H+","Hospital San José","Hospital Moscati","Gestamed","Hospital Santa Rosa de Viterbo","Hospital Santo Tomás","Hospital Médica Ebor","Hospital Santiago de Querétaro","Hospital Jardines","Clínica San Francisco","Hospital San Pedro","Hospital del Sagrado Corazón","Clínica Las Campanas","Centro Médico Jurica","Clínica CER","Hospital Idaly Medical","Clínica CEM","Otro"];
+const DOCTORS = ["Enrique Hans Mues Guizar", "Rolando L Bonilla Silva", "Otro"];
+const INSURANCES = ["AXA", "GNP", "MetLife", "Seguros Monterrey", "Mapfre", "Bupa", "Allianz", "Banorte", "Inbursa", "Sisnova", "Particular", "Otro"];
+
+const fill = (id, arr) => {
+    const s = $(id); if(!s) return;
+    arr.forEach(x => { const o = document.createElement('option'); o.value = x; o.textContent = x; s.appendChild(o); });
+};
+
+fill('add-hospital', HOSPITALS); fill('sel-hospital', HOSPITALS);
+fill('add-doctor', DOCTORS);
+fill('add-insurance', INSURANCES);
+
+function calculateAge(dob) {
+    if(!dob) return 0;
+    const diff = Date.now() - new Date(dob).getTime();
+    return Math.abs(new Date(diff).getUTCFullYear() - 1970);
+}
