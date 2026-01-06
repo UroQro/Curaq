@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
-import { calculateAge, calculateDaysDiff, calculateBMI, getLocalISODate } from '../utils';
-import { ArrowLeft, Copy, Edit, Link as LinkIcon, Save, Trash2 } from 'lucide-react';
+import { calculateAge, calculateDaysDiff, calculateBMI } from '../utils';
+import { ArrowLeft, Copy, Edit, Save } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 
 export default function PatientDetail({ patient: initialPatient, onClose, user }) {
@@ -10,10 +10,8 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
   const [showEdit, setShowEdit] = useState(false);
   const [noteType, setNoteType] = useState('visita');
   
-  // FORM STATES
   const [noteForm, setNoteForm] = useState({}); 
 
-  // Reset form when type changes
   useEffect(() => {
       setNoteForm({});
   }, [noteType]);
@@ -42,7 +40,6 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
   };
 
   const copyToWA = (n) => {
-      // WA Format Logic
       let t = `*PACIENTE:* ${patient.name}\n*HOSPITAL:* ${patient.hospital}\n`;
       const c = n.content;
       if(n.type === 'visita'){
@@ -76,14 +73,17 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
 
       <div className="p-3 space-y-4">
           {/* INFO CARD */}
-          <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm shadow-sm">
+          <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 text-sm shadow-sm relative">
               <div className="grid grid-cols-2 gap-2 mb-2">
                   <div><span className="font-bold block text-xs text-gray-400">TRATANTE</span>{patient.doctor}</div>
                   <div><span className="font-bold block text-xs text-gray-400">SEGURO</span>{patient.insurance}</div>
                   <div><span className="font-bold block text-xs text-gray-400">TELÉFONO</span><a href={`tel:${patient.phone}`} className="text-blue-500 underline">{patient.phone}</a></div>
               </div>
               <div className="border-t pt-2 mt-2 dark:border-slate-700">
-                  <span className="font-bold block text-xs text-gray-400 mb-1">ANTECEDENTES</span>
+                  <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold block text-xs text-gray-400">ANTECEDENTES</span>
+                      <button onClick={()=>setShowEdit(true)} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-200">✏️ Editar / Agregar</button>
+                  </div>
                   <div className="flex flex-wrap gap-1 mb-1">
                       {patient.antecedents?.dm && <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-bold">DM</span>}
                       {patient.antecedents?.has && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-[10px] font-bold">HAS</span>}

@@ -14,23 +14,18 @@ export default function App() {
   const [view, setView] = useState('login'); 
   const [loading, setLoading] = useState(true);
 
-  // LOGICA DE RESET A MEDIANOCHE (Checkbox visita diaria)
   const checkDailyReset = async () => {
       const todayStr = getLocalISODate();
       const metaRef = doc(db, 'metadata', 'daily_reset');
       try {
           const metaSnap = await getDoc(metaRef);
           if (!metaSnap.exists() || metaSnap.data().date !== todayStr) {
-              // Si la fecha guardada no es hoy, reseteamos todos los checkbox 'dailyCheck'
               const batch = writeBatch(db);
               const q = query(collection(db, 'patients'), where('dailyCheck', '==', true));
               const snapshot = await getDocs(q);
               snapshot.docs.forEach(doc => { batch.update(doc.ref, { dailyCheck: false }); });
-              
-              // Actualizamos la fecha de reset
               batch.set(metaRef, { date: todayStr });
               await batch.commit();
-              console.log("Daily reset complete");
           }
       } catch (e) { console.error("Reset error:", e); }
   };

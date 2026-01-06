@@ -3,10 +3,15 @@ import { db } from '../firebase';
 import { addDoc, updateDoc, collection, doc } from 'firebase/firestore';
 import { HOSPITALS, DOCTORS, INSURANCES } from '../constants';
 
-export default function PatientFormModal({ onClose, mode, initialData }) {
+export default function PatientFormModal({ onClose, mode, initialData, originContext }) {
+  // originContext: 'census' or 'programming'. Defaults status to 'active' or 'pre_admission'
+  
+  const defaultStatus = originContext === 'programming' ? 'pre_admission' : 'active';
+  
   const [form, setForm] = useState(initialData || { 
       name: '', hospital: '', type: 'Médico', doctor: '', insurance: '', dob: '', diagnosis: '', phone: '',
-      status: 'active', dailyCheck: false, preDischarge: false, notes: [],
+      status: defaultStatus, dailyCheck: false, preDischarge: false, notes: [],
+      scheduledDate: '', 
       antecedents: { dm: false, has: false, hipo: false, onco: false, other: '', meds: '', sx: '' }, allergies: ''
   });
   const [isOtherHosp, setIsOtherHosp] = useState(false);
@@ -51,6 +56,24 @@ export default function PatientFormModal({ onClose, mode, initialData }) {
                           {isOtherHosp && <input placeholder="Nombre Hospital (Abreviado)" className={`mt-1 ${inputClass} bg-blue-50 dark:bg-slate-600`} value={form.hospital} onChange={e=>setForm({...form, hospital:e.target.value})} required/>}
                       </div>
                   </div>
+
+                  {/* ANTECEDENTES SECTION IN EDIT MODE IF TRIGGERED OR CREATE */}
+                  <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded border dark:border-slate-600">
+                      <label className={labelClass}>Antecedentes</label>
+                      <div className="grid grid-cols-3 gap-2 mb-2 text-sm dark:text-white">
+                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.dm || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, dm:e.target.checked}})}/> DM</label>
+                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.has || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, has:e.target.checked}})}/> HAS</label>
+                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.hipo || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, hipo:e.target.checked}})}/> Hipo</label>
+                         <label className="flex items-center gap-1"><input type="checkbox" checked={form.antecedents?.onco || false} onChange={e=>setForm({...form, antecedents: {...form.antecedents, onco:e.target.checked}})}/> Onco</label>
+                      </div>
+                      <input placeholder="Otros..." className={`mb-2 ${inputClass} text-xs h-8`} value={form.antecedents?.other || ''} onChange={e=>setForm({...form, antecedents: {...form.antecedents, other:e.target.value}})} />
+                      <input placeholder="Alergias" className={`${inputClass} text-xs h-8 border-red-200 dark:border-red-900/50`} value={form.allergies} onChange={e=>setForm({...form, allergies:e.target.value})} />
+                  </div>
+
+                  {/* DATE SCHEDULER ONLY IF NEEDED HERE OR PRE-ADMISSION */}
+                  {originContext === 'programming' && (
+                     <div><label className={labelClass}>Fecha Programada</label><input type="date" required className={inputClass} value={form.scheduledDate} onChange={e=>setForm({...form, scheduledDate:e.target.value})} /></div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                       <div>

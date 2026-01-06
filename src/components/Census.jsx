@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, updateDoc, doc, query, where } from 'firebase/firestore';
 import { HOSPITALS, DOCTORS } from '../constants';
-import { calculateAge, downloadCSV } from '../utils';
+import { calculateAge } from '../utils';
 import PatientDetail from './PatientDetail';
 import PatientFormModal from './PatientFormModal';
 import { Plus, CheckSquare, Square, LogOut, CalendarClock, Briefcase } from 'lucide-react';
@@ -14,8 +14,7 @@ export default function Census({ user }) {
   const [filterHosp, setFilterHosp] = useState('');
   const [filterDoc, setFilterDoc] = useState('');
 
-  // Carga pacientes activos (no egresados, estatus 'active' o 'scheduled' pero visibles si estan ingresados)
-  // Simplificación: Mostramos en Censo a todos los que tienen status 'active'
+  // SOLO Carga pacientes activos (Ingresados)
   useEffect(() => {
     const q = query(collection(db, "patients"), where("status", "==", "active"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -31,23 +30,18 @@ export default function Census({ user }) {
   const sendToProgramming = async (e, p) => { 
       e.stopPropagation(); 
       const date = prompt("Fecha de Cirugía (YYYY-MM-DD):", new Date().toISOString().slice(0,10));
-      if(date) await updateDoc(doc(db, "patients", p.id), { status: 'scheduled', scheduledDate: date, activeInCensus: true }); // activeInCensus flag keeps them here too if needed, but per request we move them. let's just move status to scheduled.
-      // Correction: If patient is in hospital waiting surgery, they should be in Census AND Programming?
-      // User said: "Button to program that makes the card appear in Programming tab".
-      // Let's adopt a logic: Status 'active' = Census. Status 'scheduled' = Programming.
-      // If I change status to 'scheduled', they disappear from Census. 
-      // BETTER: Keep status 'active' and add 'scheduledDate'. Programming tab shows anyone with scheduledDate. Census shows anyone 'active'.
+      // NOTA: NO cambiamos el status a 'scheduled', solo agregamos la fecha. 
+      // El paciente permanece en Censo (status: active) y aparece en Programación.
       if(date) await updateDoc(doc(db, "patients", p.id), { scheduledDate: date });
-      alert("Paciente agregado a Programación");
+      alert("Programación actualizada.");
   };
 
   const dischargePatient = async (e, p) => { e.stopPropagation(); if(confirm(`¿Egresar a ${p.name}?`)) { await updateDoc(doc(db, "patients", p.id), { status: 'discharged', dischargeDate: new Date().toISOString() }); } };
 
-  // COLORS LOGIC
   const getCardStyle = (p) => {
     if (p.preDischarge) return "bg-purple-100 dark:bg-purple-900/40 border-l-[6px] border-purple-600";
     if (p.dailyCheck) return "bg-blue-50 dark:bg-blue-900/30 border-l-[6px] border-blue-600";
-    return "bg-red-50 dark:bg-red-900/30 border-l-[6px] border-red-600"; // Default Morning Red
+    return "bg-red-50 dark:bg-red-900/30 border-l-[6px] border-red-600"; 
   };
 
   if (selectedPatient) return <PatientDetail patient={selectedPatient} onClose={() => setSelectedPatient(null)} user={user} />;
@@ -78,7 +72,6 @@ export default function Census({ user }) {
                      </div>
                   </div>
                   
-                  {/* ACTIONS COLUMN */}
                   <div className="flex flex-col items-end justify-between h-full gap-3 pl-2 border-l border-slate-200/50 dark:border-slate-700/50">
                       <button onClick={(e) => toggleDailyCheck(e, p)} title="Visita Realizada">
                           {p.dailyCheck ? <CheckSquare size={28} className="text-blue-600 dark:text-blue-400"/> : <Square size={28} className="text-red-500/80 hover:text-red-600"/>}
@@ -97,7 +90,7 @@ export default function Census({ user }) {
       </div>
 
       <button onClick={() => setShowAddModal(true)} className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl hover:bg-blue-700 transition z-20"><Plus size={28} /></button>
-      {showAddModal && <PatientFormModal onClose={() => setShowAddModal(false)} mode="create" />}
+      {showAddModal && <PatientFormModal onClose={() => setShowAddModal(false)} mode="create" originContext="census" />}
     </div>
   );
 }
