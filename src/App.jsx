@@ -10,18 +10,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-100"><HeartPulse className="animate-pulse text-blue-600" size={48}/></div>;
-  
-  // Si no hay usuario, mostrar el Login (Diseño de la captura)
+  if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50"><HeartPulse className="animate-pulse text-blue-600" size={48}/></div>;
   if (!user) return <Login />;
-
-  // Si hay usuario, mostrar el Dashboard (Estilo Rounds App)
   return <Dashboard user={user} onLogout={() => signOut(auth)} />;
 }
