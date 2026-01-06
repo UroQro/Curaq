@@ -5,7 +5,6 @@ import { calculateAge, calculateDaysDiff, calculateBMI } from '../utils';
 import { ArrowLeft, Copy, Edit, Save, Check, X, Plus, Trash2, Syringe } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 
-// --- COMPONENTE INPUT DEFINIDO AFUERA PARA EVITAR RE-RENDER FOCUS LOSS ---
 const NoteInput = ({ label, k, form, setForm, placeholder, type="text" }) => (
   <div className="flex flex-col">
     <label className="text-[10px] uppercase font-bold text-gray-400">{label}</label>
@@ -304,10 +303,13 @@ export default function PatientDetail({ patient: initialPatient, onClose, user }
           <div className="space-y-3">
               {patient.notes?.slice().reverse().map(note => (
                   <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded shadow-sm border border-gray-100 dark:border-slate-700 relative group">
-                      <div className="flex justify-between items-center text-xs text-gray-400 mb-2 border-b pb-1">
-                          <span>{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
+                      <div className="flex justify-between items-start mb-2 border-b pb-1">
+                          <div className="flex flex-col">
+                              <span className="text-[10px] text-gray-400">{new Date(note.timestamp).toLocaleDateString()} {new Date(note.timestamp).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}</span>
+                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Por: {note.author}</span>
+                          </div>
                           <div className="flex items-center gap-2">
-                              <span className="uppercase font-bold bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
+                              <span className="uppercase font-bold text-[10px] bg-gray-100 dark:bg-slate-700 px-1 rounded">{note.type}</span>
                               <button onClick={() => copyToWA(note)} className="text-gray-400 hover:text-green-500 transition-colors" title="Copiar a WhatsApp"><Copy size={14}/></button>
                               <button onClick={() => loadNoteForEditing(note)} className="text-blue-400 hover:text-blue-600"><Edit size={14}/></button>
                               <button onClick={() => deleteNote(note.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>

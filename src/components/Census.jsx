@@ -45,7 +45,8 @@ export default function Census({ user }) {
 
   return (
     <div className="pb-24">
-      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow border border-slate-200 dark:border-slate-700 mb-4 sticky top-0 z-10 flex gap-2">
+      {/* UPDATE: RESPONSIVE FILTERS (flex-col on mobile, flex-row on desktop) */}
+      <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow border border-slate-200 dark:border-slate-700 mb-4 sticky top-0 z-10 flex flex-col md:flex-row gap-2">
          <select className="flex-1 p-2 border rounded text-xs bg-slate-50 dark:bg-slate-700 dark:text-white dark:border-slate-600" value={filterHosp} onChange={e=>setFilterHosp(e.target.value)}><option value="">Todos los Hospitales</option>{HOSPITALS.map(h => <option key={h.abbr} value={h.abbr}>{h.abbr} - {h.full}</option>)}</select>
          <select className="flex-1 p-2 border rounded text-xs bg-slate-50 dark:bg-slate-700 dark:text-white dark:border-slate-600" value={filterDoc} onChange={e=>setFilterDoc(e.target.value)}><option value="">Todos los Tratantes</option>{DOCTORS.map(d => <option key={d}>{d}</option>)}<option value="Otro">Otro...</option></select>
       </div>
