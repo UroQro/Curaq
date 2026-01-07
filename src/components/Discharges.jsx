@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { downloadCSV } from '../utils';
-import { Search, Trash2, Undo } from 'lucide-react';
+import { Search, Trash2, Undo, Download } from 'lucide-react';
 
 export default function Discharges() {
   const [list, setList] = useState([]);
@@ -27,6 +27,18 @@ export default function Discharges() {
       }
   };
 
+  const exportCSV = () => {
+      const data = list.map(p => [
+          p.dischargeDate || '', 
+          p.name, 
+          p.diagnosis || '', 
+          p.hospital, 
+          p.doctor, 
+          p.insurance
+      ]);
+      downloadCSV(data, ["Fecha Egreso", "Paciente", "Diagnostico", "Hospital", "Medico", "Seguro"], "Reporte_Egresos.csv");
+  };
+
   const filteredList = list.filter(p => 
       p.name.toLowerCase().includes(search.toLowerCase()) || 
       p.diagnosis.toLowerCase().includes(search.toLowerCase()) ||
@@ -36,7 +48,10 @@ export default function Discharges() {
   return (
     <div className="pb-20">
        <div className="bg-white dark:bg-slate-800 p-4 rounded shadow mb-4 space-y-3">
-           <h2 className="font-bold text-xl dark:text-white">Historial de Egresos</h2>
+           <div className="flex justify-between items-center">
+               <h2 className="font-bold text-xl dark:text-white">Historial de Egresos</h2>
+               <button onClick={exportCSV} className="bg-green-600 text-white text-xs px-3 py-1.5 rounded font-bold shadow hover:bg-green-700 flex items-center gap-1"><Download size={14}/> CSV</button>
+           </div>
            <div className="flex items-center bg-gray-100 dark:bg-slate-700 rounded px-3 py-2">
                <Search size={18} className="text-gray-400 mr-2"/>
                <input className="bg-transparent outline-none w-full text-sm dark:text-white" placeholder="Buscar por nombre, diagnóstico o doctor..." value={search} onChange={e=>setSearch(e.target.value)} />

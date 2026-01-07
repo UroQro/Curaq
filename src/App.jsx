@@ -14,18 +14,49 @@ export default function App() {
   const [view, setView] = useState('login'); 
   const [loading, setLoading] = useState(true);
 
+  // LOGICA DIARIA: RESETEA CHECKBOXES Y ARCHIVA AMBULATORIOS PASADOS
   const checkDailyReset = async () => {
       const todayStr = getLocalISODate();
       const metaRef = doc(db, 'metadata', 'daily_reset');
+      
       try {
           const metaSnap = await getDoc(metaRef);
+          
+          // Si la fecha guardada no es hoy (o no existe), ejecutamos el reset
           if (!metaSnap.exists() || metaSnap.data().date !== todayStr) {
+              console.log("Running daily reset for:", todayStr);
               const batch = writeBatch(db);
-              const q = query(collection(db, 'patients'), where('dailyCheck', '==', true));
-              const snapshot = await getDocs(q);
-              snapshot.docs.forEach(doc => { batch.update(doc.ref, { dailyCheck: false }); });
+              
+              // 1. Resetear Checkbox de Visita (Pacientes Activos)
+              const qCheck = query(collection(db, 'patients'), where('dailyCheck', '==', true));
+              const snapCheck = await getDocs(qCheck);
+              snapCheck.docs.forEach(doc => { batch.update(doc.ref, { dailyCheck: false }); });
+              
+              // 2. AUTO-EGRESO AMBULATORIOS: Buscar pacientes 'pre_admission' con fecha < hoy
+              // Nota: Firestore no permite desigualdades en campos diferentes fácilmente, lo hacemos en memoria para seguridad
+              const qAmb = query(collection(db, 'patients'), where('status', '==', 'pre_admission'));
+              const snapAmb = await getDocs(qAmb);
+              
+              let autoDischargedCount = 0;
+              snapAmb.docs.forEach(d => {
+                  const p = d.data();
+                  // Si tiene fecha programada Y esa fecha es menor a hoy (ya pasó)
+                  if (p.scheduledDate && p.scheduledDate < todayStr) {
+                      // Se mueve a egresados con fecha de egreso = fecha de cirugía
+                      batch.update(d.ref, { 
+                          status: 'discharged', 
+                          dischargeDate: p.scheduledDate,
+                          autoArchived: true // Flag opcional para debug
+                      });
+                      autoDischargedCount++;
+                  }
+              });
+
+              // Guardar nueva fecha de reset
               batch.set(metaRef, { date: todayStr });
+              
               await batch.commit();
+              console.log(`Reset complete. ${autoDischargedCount} ambulatory patients archived.`);
           }
       } catch (e) { console.error("Reset error:", e); }
   };

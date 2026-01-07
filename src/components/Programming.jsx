@@ -11,12 +11,10 @@ export default function Programming({ user }) {
   const [showModal, setShowModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   
-  // RAW LIST LOAD
   useEffect(() => {
     const q = query(collection(db, "patients"), where("scheduledDate", "!=", ""));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort by date standard
       data.sort((a,b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
       setList(data);
     });
@@ -26,7 +24,6 @@ export default function Programming({ user }) {
   const today = getLocalISODate();
 
   const exportCSV = () => {
-      // Export ALL history from 'list'
       const data = list.map(p => [p.scheduledDate, p.name, p.surgery || p.procedure || 'N/A', p.hospital, p.doctor, p.insurance]);
       downloadCSV(data, ["Fecha", "Paciente", "Cirugia", "Hospital", "Dr", "Seguro"], "Programacion_Qx.csv");
   };
@@ -47,11 +44,8 @@ export default function Programming({ user }) {
 
   if (selectedPatient) return <PatientDetail patient={selectedPatient} onClose={() => setSelectedPatient(null)} user={user} />;
 
-  // --- LOGIC: FILTER & GROUP ---
-  // 1. Filter: Only show dates >= today
   const upcomingList = list.filter(p => p.scheduledDate >= today);
 
-  // 2. Group by Date Key
   const groupedPatients = upcomingList.reduce((acc, p) => {
       const d = p.scheduledDate;
       if (!acc[d]) acc[d] = [];
@@ -59,12 +53,10 @@ export default function Programming({ user }) {
       return acc;
   }, {});
 
-  // 3. Get sorted keys
   const sortedDates = Object.keys(groupedPatients).sort();
 
   return (
     <div className="pb-20">
-       {/* HEADER: RESPONSIVE (Stack on mobile) */}
        <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-lg shadow mb-4 border border-blue-100 dark:border-slate-700 gap-3">
            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2 w-full md:w-auto"><Calendar className="text-blue-500"/> Programación</h2>
            <div className="flex gap-2 w-full md:w-auto">
@@ -81,7 +73,6 @@ export default function Programming({ user }) {
 
                return (
                    <div key={dateKey} className="space-y-2">
-                       {/* DATE SEPARATOR BAR */}
                        <div className={`text-xs font-bold px-3 py-1.5 rounded uppercase tracking-wider ${isToday ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-200 text-gray-600 dark:bg-slate-700 dark:text-gray-300'}`}>
                            {dateLabel} {isToday && "(HOY)"}
                        </div>

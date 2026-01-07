@@ -1,3 +1,9 @@
+
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+};
+
 export const calculateAge = (dob) => {
   if (!dob) return '';
   const diff = Date.now() - new Date(dob).getTime();
@@ -29,8 +35,18 @@ export const getLocalISODate = () => {
 };
 
 export const downloadCSV = (data, headers, filename) => {
-  const csvContent = "data:text/csv;charset=utf-8," 
-    + [headers.join(","), ...data.map(e => e.join(","))].join("\n");
+  // Normalize headers and data to remove accents for compatibility
+  const normalizedHeaders = headers.map(h => normalizeText(h));
+  
+  // Create rows with quoted values to handle commas safely
+  const csvRows = [
+      normalizedHeaders.join(","),
+      ...data.map(row => 
+          row.map(cell => `"${normalizeText(cell)}"`).join(",")
+      )
+  ];
+
+  const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
