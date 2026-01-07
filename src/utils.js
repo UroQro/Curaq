@@ -35,17 +35,11 @@ export const getLocalISODate = () => {
 };
 
 export const downloadCSV = (data, headers, filename) => {
-  // Normalize headers and data to remove accents for compatibility
   const normalizedHeaders = headers.map(h => normalizeText(h));
-  
-  // Create rows with quoted values to handle commas safely
   const csvRows = [
       normalizedHeaders.join(","),
-      ...data.map(row => 
-          row.map(cell => `"${normalizeText(cell)}"`).join(",")
-      )
+      ...data.map(row => row.map(cell => `"${normalizeText(cell)}"`).join(","))
   ];
-
   const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");

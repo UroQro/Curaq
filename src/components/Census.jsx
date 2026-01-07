@@ -5,7 +5,7 @@ import { HOSPITALS, DOCTORS } from '../constants';
 import { calculateAge } from '../utils';
 import PatientDetail from './PatientDetail';
 import PatientFormModal from './PatientFormModal';
-import { Plus, CheckSquare, Square, LogOut, CalendarClock, Briefcase, Syringe } from 'lucide-react';
+import { Plus, CheckSquare, Square, LogOut, CalendarClock, Briefcase, Syringe, AlertCircle } from 'lucide-react';
 
 export default function Census({ user }) {
   const [patients, setPatients] = useState([]);
@@ -51,7 +51,9 @@ export default function Census({ user }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3">
-         {patients.filter(p => !filterHosp || p.hospital === filterHosp).filter(p => !filterDoc || p.doctor === filterDoc || (filterDoc === 'Otro' && !DOCTORS.includes(p.doctor))).map(p => (
+         {patients.filter(p => !filterHosp || p.hospital === filterHosp).filter(p => !filterDoc || p.doctor === filterDoc || (filterDoc === 'Otro' && !DOCTORS.includes(p.doctor))).map(p => {
+            const hasPending = p.checklist?.some(t => !t.done);
+            return (
             <div key={p.id} onClick={() => setSelectedPatient(p)} className={`p-4 rounded-lg cursor-pointer shadow-sm relative transition-all active:scale-[0.98] ${getCardStyle(p)}`}>
                <div className="flex justify-between items-start">
                   <div className="flex-1 pr-2">
@@ -60,7 +62,10 @@ export default function Census({ user }) {
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{p.type}</span>
                         {p.scheduledDate && <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1 rounded font-bold flex items-center gap-1"><CalendarClock size={10}/> Programado</span>}
                      </div>
-                     <h3 className="font-extrabold text-lg text-slate-900 dark:text-white leading-tight mb-1">{p.name}</h3>
+                     <h3 className="font-extrabold text-lg text-slate-900 dark:text-white leading-tight mb-1 flex items-center gap-2">
+                         {p.name}
+                         {hasPending && <AlertCircle size={18} className="text-orange-500 fill-orange-100" />}
+                     </h3>
                      <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{calculateAge(p.dob)} años • {p.diagnosis}</p>
                      {p.surgery && <p className="text-xs font-bold text-blue-600 dark:text-blue-300 flex items-center gap-1"><Syringe size={12}/> {p.surgery}</p>}
                      <div className="text-xs opacity-80 flex gap-3 text-slate-500 dark:text-slate-400 mt-2">
@@ -82,7 +87,7 @@ export default function Census({ user }) {
                   </div>
                </div>
             </div>
-         ))}
+         )})}
          {patients.length === 0 && <div className="text-center p-10 text-slate-400">No hay pacientes activos en el censo.</div>}
       </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore';
 import { downloadCSV, getLocalISODate } from '../utils';
-import { Calendar, Download, Trash2, Syringe, LogIn } from 'lucide-react';
+import { Calendar, Download, Trash2, Syringe, LogIn, CalendarDays, AlertCircle } from 'lucide-react';
 import PatientFormModal from './PatientFormModal';
 import PatientDetail from './PatientDetail';
 
@@ -42,6 +42,15 @@ export default function Programming({ user }) {
       }
   };
 
+  const handleReschedule = async (e, p) => {
+      e.stopPropagation();
+      const current = p.scheduledDate;
+      const newDate = prompt("Nueva Fecha de Cirugía (YYYY-MM-DD):", current);
+      if (newDate && newDate !== current) {
+          await updateDoc(doc(db, "patients", p.id), { scheduledDate: newDate });
+      }
+  };
+
   if (selectedPatient) return <PatientDetail patient={selectedPatient} onClose={() => setSelectedPatient(null)} user={user} />;
 
   const upcomingList = list.filter(p => p.scheduledDate >= today);
@@ -77,7 +86,9 @@ export default function Programming({ user }) {
                            {dateLabel} {isToday && "(HOY)"}
                        </div>
 
-                       {groupedPatients[dateKey].map(p => (
+                       {groupedPatients[dateKey].map(p => {
+                           const hasPending = p.checklist?.some(t => !t.done);
+                           return (
                            <div key={p.id} onClick={() => setSelectedPatient(p)} className="cursor-pointer bg-white dark:bg-slate-800 p-4 rounded-lg shadow border-l-[6px] border-blue-500 dark:border-blue-400 hover:opacity-90 transition active:scale-[0.98]">
                                <div className="flex justify-between items-start">
                                    <div>
@@ -87,7 +98,10 @@ export default function Programming({ user }) {
                                            {p.status === 'pre_admission' && <span className="text-[10px] border border-blue-200 text-blue-500 px-1 rounded uppercase">Ambulatorio</span>}
                                            {p.status === 'active' && <span className="text-[10px] bg-red-100 text-red-500 px-1 rounded uppercase font-bold">Hospitalizado</span>}
                                        </div>
-                                       <h3 className="text-lg font-bold text-slate-900 dark:text-white">{p.name}</h3>
+                                       <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                           {p.name}
+                                           {hasPending && <AlertCircle size={18} className="text-orange-500 fill-orange-100" />}
+                                       </h3>
                                        <p className="text-sm text-blue-600 dark:text-blue-300 font-medium">{p.diagnosis}</p>
                                        {p.surgery && <p className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1"><Syringe size={12}/> {p.surgery}</p>}
                                        <div className="text-xs text-slate-500 mt-1">{p.doctor} • {p.insurance}</div>
@@ -96,11 +110,12 @@ export default function Programming({ user }) {
                                        {p.status === 'pre_admission' && (
                                            <button onClick={(e)=>admitPatient(e, p)} className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 p-2 rounded-full hover:bg-indigo-200" title="Ingresar a Piso"><LogIn size={16}/></button>
                                        )}
+                                       <button onClick={(e)=>handleReschedule(e, p)} className="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 p-2 rounded-full hover:bg-orange-200" title="Reagendar"><CalendarDays size={16}/></button>
                                        <button onClick={(e)=>removeFromSchedule(e, p.id)} className="text-red-400 hover:text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded-full"><Trash2 size={16}/></button>
                                    </div>
                                </div>
                            </div>
-                       ))}
+                       )})}
                    </div>
                );
            })}
