@@ -7,7 +7,7 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
   const defaultStatus = originContext === 'programming' ? 'pre_admission' : 'active';
   
   const [form, setForm] = useState(initialData || { 
-      name: '', hospital: '', type: 'Médico', doctor: '', insurance: '', dob: '', diagnosis: '', phone: '',
+      name: '', hospital: '', bedNumber: '', type: 'Médico', doctor: '', insurance: '', dob: '', diagnosis: '', phone: '',
       status: defaultStatus, dailyCheck: false, preDischarge: false, notes: [], checklist: [],
       scheduledDate: '', surgery: '',
       antecedents: { dm: false, has: false, hipo: false, onco: false, other: '', meds: '', sx: '' }, allergies: ''
@@ -41,19 +41,24 @@ export default function PatientFormModal({ onClose, mode, initialData, originCon
                       <div><label className={labelClass}>Teléfono</label><input type="tel" className={inputClass} value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} placeholder="10 dígitos" /></div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* MODIFICADO: Layout de 3 columnas para incluir cama */}
+                  <div className="grid grid-cols-[1fr_1fr_0.7fr] gap-3">
                       <div>
-                          <label className={labelClass}>Tipo de Caso</label>
+                          <label className={labelClass}>Tipo</label>
                           <select className={inputClass} value={form.type} onChange={e=>setForm({...form, type:e.target.value})}><option>Médico</option><option>Quirúrgico</option><option>Interconsulta</option></select>
                       </div>
                       <div>
                           <label className={labelClass}>Hospital</label>
                           <select required={!isOtherHosp} className={inputClass} value={isOtherHosp?'Otro':form.hospital} onChange={e=>{if(e.target.value==='Otro'){setIsOtherHosp(true);setForm({...form,hospital:''})}else{setIsOtherHosp(false);setForm({...form,hospital:e.target.value})}}}>
-                             <option value="">Seleccionar...</option>{HOSPITALS.map(h=><option key={h.abbr} value={h.abbr}>{h.full}</option>)}<option value="Otro">Otro...</option>
+                             <option value="">...</option>{HOSPITALS.map(h=><option key={h.abbr} value={h.abbr}>{h.abbr}</option>)}<option value="Otro">Otro...</option>
                           </select>
-                          {isOtherHosp && <input placeholder="Nombre Hospital (Abreviado)" className={`mt-1 ${inputClass} bg-blue-50 dark:bg-slate-600`} value={form.hospital} onChange={e=>setForm({...form, hospital:e.target.value})} required/>}
+                      </div>
+                      <div>
+                          <label className={labelClass}>Cama</label>
+                          <input className={inputClass} value={form.bedNumber} onChange={e=>setForm({...form, bedNumber:e.target.value})} placeholder="Ej. 304" />
                       </div>
                   </div>
+                  {isOtherHosp && <input placeholder="Nombre Hospital (Abreviado)" className={`mt-0 ${inputClass} bg-blue-50 dark:bg-slate-600`} value={form.hospital} onChange={e=>setForm({...form, hospital:e.target.value})} required/>}
 
                   <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded border dark:border-slate-600">
                       <label className={labelClass}>Antecedentes</label>
